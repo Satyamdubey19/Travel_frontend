@@ -29,6 +29,14 @@ Run the development server:
 npm run dev
 ```
 
+API requests under `/api/*` are proxied to the backend. By default, the frontend expects the backend at:
+
+```text
+http://localhost:4000
+```
+
+Override this with `BACKEND_API_URL` if the backend runs somewhere else.
+
 The app runs on the default Next.js development URL:
 
 ```text
