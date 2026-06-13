@@ -50,8 +50,8 @@ export default function AdminHostsPage() {
       setHosts([
         {
           id: '1',
-          businessName: 'Mumbai Hotels Ltd',
-          email: 'contact@mumbaihotels.com',
+          businessName: 'Mumbai Travel Ltd',
+          email: 'contact@mumbaitravel.com',
           phone: '+91-9876543210',
           city: 'Mumbai',
           isVerified: true,

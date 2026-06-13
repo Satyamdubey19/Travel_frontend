@@ -31,7 +31,7 @@ export default function Home() {
             Plan trips, tours, activities, and rentals.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-            Hotel stays and hotel listing workflows have been removed. Continue with the travel products that remain active on this platform.
+            Continue with tours, activities, and rentals across the travel products active on this platform.
           </p>
 
           <div className="mt-10 grid gap-4 md:grid-cols-3">

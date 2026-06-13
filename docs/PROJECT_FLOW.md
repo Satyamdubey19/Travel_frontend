@@ -133,7 +133,7 @@ docs/modules/UI_STATE.md
 ```text
 /profile                  User profile
 /my-bookings              User booking history
-/wishlist                 Saved hotels, tours, rentals, and activities
+/wishlist                 Saved tours, rentals, and activities
 ```
 
 ### Host Pages
@@ -187,10 +187,13 @@ Auth is coordinated by `contexts/AuthContext.tsx`.
 LoginForm
   -> AuthContext.login(email, password, expectedRole?)
   -> POST /api/auth/login
-  -> backend validates credentials
+  -> backend validates credentials, email verification, account status, and lockout state
+  -> backend sets httpOnly token and refreshToken cookies
   -> returns user payload
   -> frontend stores sanitized user in localStorage
 ```
+
+The frontend does not read either cookie directly. Authenticated API requests rely on the browser sending the backend cookies, and `GET /api/auth/me` is the source of truth after hydration.
 
 If the API is unavailable, the context can fall back to browser-stored demo/local accounts. This is only a development convenience and should not be treated as production authentication.
 
@@ -221,6 +224,7 @@ Logged-in user
 logout()
   -> clears local session
   -> POST /api/auth/logout
+  -> backend clears token and refreshToken cookies
   -> signOut({ redirect: false })
 ```
 
@@ -404,7 +408,6 @@ Listing card
 Supported wishlist targets:
 
 ```text
-HOTEL
 TOUR
 RENTAL
 ACTIVITY

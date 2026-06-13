@@ -52,8 +52,8 @@ export default function AdminUsersPage() {
         },
         {
           id: '2',
-          email: 'hotel@example.com',
-          name: 'Mumbai Hotels',
+          email: 'host@example.com',
+          name: 'Mumbai Travel Co',
           phone: '+91-9876543211',
           role: 'HOST',
           createdAt: new Date(Date.now() - 60*24*60*60*1000).toISOString(),

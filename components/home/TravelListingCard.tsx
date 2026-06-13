@@ -63,9 +63,9 @@ export default function TravelListingCard({
   const safeOriginalPrice = originalPrice ? Math.max(safePrice, Math.round(originalPrice)) : null
   const getSafeImage = (src?: string) => {
     const candidate = src?.trim()
-    if (!candidate) return imageFallback ?? "/images/hotel-slider-fallback.png"
+    if (!candidate) return imageFallback ?? "/images/travel-listing-fallback.png"
     if (candidate.startsWith("/") || candidate.startsWith("https://images.unsplash.com") || candidate.startsWith("https://res.cloudinary.com")) return candidate
-    return imageFallback ?? "/images/hotel-slider-fallback.png"
+    return imageFallback ?? "/images/travel-listing-fallback.png"
   }
   const [currentImage, setCurrentImage] = useState(() => getSafeImage(image))
   const [visualSaved, setVisualSaved] = useState(wishlist?.saved ?? false)

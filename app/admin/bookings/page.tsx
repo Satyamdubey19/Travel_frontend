@@ -151,8 +151,7 @@ export default function AdminBookingsPage() {
               <thead className="border-b border-slate-200 bg-slate-50/80">
                 <tr>
                   <th className="px-6 py-4 text-left font-semibold text-gray-900">Guest</th>
-                  <th className="px-6 py-4 text-left font-semibold text-gray-900">Property</th>
-                  <th className="px-6 py-4 text-left font-semibold text-gray-900">Rooms</th>
+                  <th className="px-6 py-4 text-left font-semibold text-gray-900">Trip</th>
                   <th className="px-6 py-4 text-left font-semibold text-gray-900">Host</th>
                   <th className="px-6 py-4 text-left font-semibold text-gray-900">Dates</th>
                   <th className="px-6 py-4 text-left font-semibold text-gray-900">Price</th>
@@ -172,28 +171,12 @@ export default function AdminBookingsPage() {
                     <td className="px-6 py-4">
                       <div>
                         <p className="font-semibold text-gray-900">
-                          {booking.hotelName || booking.tourName || '-'}
+                          {booking.tourName || '-'}
                         </p>
                         {booking.isOverridden && (
                           <p className="text-xs font-medium text-sky-700">Overridden by admin</p>
                         )}
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {booking.rooms?.length ? (
-                        <div className="space-y-1">
-                          {booking.rooms.map((room) => (
-                            <div key={room.id} className="text-xs">
-                              <p className="font-semibold text-slate-800">{room.name} x{room.quantity}</p>
-                              <p className="text-slate-500">
-                                {room.availableRooms} available / {room.bookedRooms} booked
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-500">-</span>
-                      )}
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-gray-900">{booking.hostName}</p>
@@ -254,7 +237,7 @@ export default function AdminBookingsPage() {
                   <strong>Guest:</strong> {selectedBooking.guestName}
                 </p>
                 <p className="text-sky-900">
-                  <strong>Property:</strong> {selectedBooking.hotelName || selectedBooking.tourName}
+                  <strong>Trip:</strong> {selectedBooking.tourName}
                 </p>
                 <p className="text-sky-900">
                   <strong>Current Status:</strong> {selectedBooking.status.toUpperCase()}

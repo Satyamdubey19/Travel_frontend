@@ -18,7 +18,6 @@ interface Payment {
   booking: {
     id: string
     numberOfGuests: number
-    hotel?: { name: string }
     tour?: { name: string }
   }
 }
@@ -190,7 +189,7 @@ export default function PaymentsPage() {
                 {payments.map(payment => (
                   <tr key={payment.id} className="transition hover:bg-slate-50">
                     <td className="px-5 py-4">
-                      <p className="font-semibold text-slate-900">{payment.booking.hotel?.name || payment.booking.tour?.name}</p>
+                      <p className="font-semibold text-slate-900">{payment.booking.tour?.name || "Booking"}</p>
                       <p className="text-xs text-slate-400">{payment.transactionId}</p>
                     </td>
                     <td className="px-5 py-4 font-semibold text-slate-700">Rs. {payment.amount.toFixed(2)}</td>

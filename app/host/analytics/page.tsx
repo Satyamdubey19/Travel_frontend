@@ -12,7 +12,7 @@ const revenueBars = [42, 58, 54, 72, 66, 84, 78, 92]
 const bookingBars = [36, 48, 44, 68, 62, 74, 88, 82]
 
 const properties = [
-  { name: "Grand Hotel", bookings: 45, revenue: "Rs 8.5L", occupancy: "85%", rating: "4.9" },
+  { name: "Grand Tour", bookings: 45, revenue: "Rs 8.5L", occupancy: "85%", rating: "4.9" },
   { name: "Beach Resort", bookings: 32, revenue: "Rs 6.4L", occupancy: "72%", rating: "4.7" },
   { name: "Mountain Adventure", bookings: 18, revenue: "Rs 3.6L", occupancy: "65%", rating: "4.6" },
 ]

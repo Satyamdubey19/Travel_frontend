@@ -143,7 +143,7 @@ const handleSocialSignup = () => {
         </div>
         {accountType === 'HOST' && (
           <p className="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-            List your hotel, tour, or rental and start accepting bookings.
+            List your tour, activity, or rental and start accepting bookings.
           </p>
         )}
 

@@ -119,7 +119,7 @@ export default function PostsPage() {
                 {/* Category Badge */}
                 <div className="absolute top-5 left-5">
                   <span className="px-4 py-2 bg-white/95 backdrop-blur-md text-slate-900 text-xs font-bold rounded-full shadow-lg">
-                    {currentPost.category === 'hotel' ? '🏨 Hotel' : currentPost.category === 'tour' ? '✈️ Tour' : '🌍 Destination'}
+                    {currentPost.category === 'activity' ? 'Activity' : currentPost.category === 'tour' ? 'Tour' : 'Destination'}
                   </span>
                 </div>
 
@@ -254,7 +254,7 @@ export default function PostsPage() {
             <ul className="space-y-4 text-slate-700">
               <li className="flex gap-4 items-start">
                 <span className="text-blue-600 font-bold text-xl flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 rounded-full">1</span>
-                <span className="text-base pt-1">Book a hotel or tour using <span className="font-bold text-blue-600">#GetHotels</span></span>
+                <span className="text-base pt-1">Book a tour or activity using <span className="font-bold text-blue-600">#GetHotels</span></span>
               </li>
               <li className="flex gap-4 items-start">
                 <span className="text-blue-600 font-bold text-xl flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 rounded-full">2</span>

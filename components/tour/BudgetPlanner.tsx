@@ -56,7 +56,7 @@ export const BudgetPlanner = ({ basePrice }: BudgetPlannerProps) => {
       <div className="grid grid-cols-3 gap-3">
         {([
           { key: 'budget' as const, label: 'Budget', desc: 'Hostels & local food', icon: '🎒' },
-          { key: 'comfort' as const, label: 'Comfort', desc: 'Hotels & restaurants', icon: '🏨' },
+          { key: 'comfort' as const, label: 'Comfort', desc: 'Stays & restaurants', icon: '🏨' },
           { key: 'premium' as const, label: 'Premium', desc: 'Luxury & fine dining', icon: '✨' },
         ]).map((style) => (
           <button
@@ -223,7 +223,7 @@ export const BudgetPlanner = ({ basePrice }: BudgetPlannerProps) => {
         <p className="text-xs font-semibold text-slate-700 mb-2">💡 Budget Tips</p>
         <ul className="text-xs text-slate-600 space-y-1.5">
           <li className="flex items-start gap-2"><span className="text-amber-500 mt-0.5">•</span>Book 30+ days in advance for 10-15% lower prices</li>
-          <li className="flex items-start gap-2"><span className="text-amber-500 mt-0.5">•</span>Groups of 4+ get better per-person rates on hotels</li>
+          <li className="flex items-start gap-2"><span className="text-amber-500 mt-0.5">•</span>Groups of 4+ can get better per-person rates on shared trip costs</li>
           <li className="flex items-start gap-2"><span className="text-amber-500 mt-0.5">•</span>Carry cash for local markets — cards may not work everywhere</li>
           <li className="flex items-start gap-2"><span className="text-amber-500 mt-0.5">•</span>Set aside ₹500-1000/day for unplanned expenses</li>
         </ul>

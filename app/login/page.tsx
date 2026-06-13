@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import LoginForm from '@/components/auth/LoginForm';
 
 const travelerFeatures = [
-  ['GH', 'Find Your Perfect Stay', 'Thousands of hotels worldwide'],
+  ['GH', 'Plan Better Trips', 'Tours, activities, and rentals'],
   ['TR', 'Plan Exciting Tours', 'Curated travel experiences'],
   ['Rs', 'Best Prices Guaranteed', 'Exclusive deals and transparent pricing'],
 ];

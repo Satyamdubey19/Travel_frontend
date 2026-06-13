@@ -8,7 +8,7 @@ const testimonials = [
     location: "Delhi, India",
     avatar: "PS",
     rating: 5,
-    text: "GetHotels made our family trip to Mussoorie absolutely seamless. The hotel recommendations were spot-on and the booking process was incredibly smooth!",
+    text: "GetHotels made our family trip to Mussoorie absolutely seamless. The tour recommendations were spot-on and the booking process was incredibly smooth!",
     trip: "Family Trip to Mussoorie",
   },
   {
@@ -16,7 +16,7 @@ const testimonials = [
     location: "Mumbai, India",
     avatar: "RV",
     rating: 5,
-    text: "I've tried many booking platforms, but GetHotels stands out with its curated selection and genuine reviews. Found my perfect mountain retreat in minutes.",
+    text: "I've tried many booking platforms, but GetHotels stands out with its curated selection and genuine reviews. Found my perfect mountain itinerary in minutes.",
     trip: "Solo Trip to Dehradun",
   },
   {

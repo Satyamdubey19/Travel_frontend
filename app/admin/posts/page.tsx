@@ -23,7 +23,7 @@ type PostRow = {
     status: string;
   };
   listing: {
-    type: 'hotel' | 'tour';
+    type: 'tour' | 'activity' | 'destination';
     id: string;
     title: string;
     location: string;
@@ -105,7 +105,7 @@ export default function AdminPostsPage() {
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void fetchPosts();
               }}
-              placeholder="Search captions, users, hotels, tours, or locations"
+              placeholder="Search captions, users, tours, activities, or locations"
               className="pl-11"
             />
           </div>
