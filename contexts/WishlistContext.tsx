@@ -9,14 +9,14 @@ export type WishlistItem = {
   title: string
   image: string
   price: number
-  type: 'hotel' | 'tour'
+  type: 'tour'
 }
 
 type WishlistContextType = {
   wishlist: WishlistItem[]
   addToWishlist: (item: WishlistItem) => void
-  removeFromWishlist: (slug: string, type: 'hotel' | 'tour') => void
-  isInWishlist: (slug: string, type: 'hotel' | 'tour') => boolean
+  removeFromWishlist: (slug: string, type: 'tour') => void
+  isInWishlist: (slug: string, type: 'tour') => boolean
   clearWishlist: () => void
 }
 
@@ -28,12 +28,7 @@ type WishlistNotice = {
 
 type ServerWishlistItem = {
   id: string
-  target: 'HOTEL' | 'TOUR' | 'RENTAL' | 'ACTIVITY'
-  Hotel?: {
-    title?: string | null
-    slug?: string | null
-    HotelImage?: Array<{ url?: string | null }>
-  } | null
+  target: 'TOUR' | 'RENTAL' | 'ACTIVITY'
   Tour?: {
     title?: string | null
     slug?: string | null
@@ -43,23 +38,12 @@ type ServerWishlistItem = {
 }
 
 const mapServerWishlistItem = (item: ServerWishlistItem): WishlistItem | null => {
-  if (item.target === 'HOTEL' && item.Hotel?.slug) {
-    return {
-      id: item.id,
-      slug: item.Hotel.slug,
-      title: item.Hotel.title ?? 'Hotel',
-      image: item.Hotel.HotelImage?.[0]?.url ?? '/images/hotel-slider-fallback.png',
-      price: 0,
-      type: 'hotel',
-    }
-  }
-
   if (item.target === 'TOUR' && item.Tour?.slug) {
     return {
       id: item.id,
       slug: item.Tour.slug,
       title: item.Tour.title ?? 'Tour',
-      image: item.Tour.images?.[0] ?? '/images/hotel-slider-fallback.png',
+      image: item.Tour.images?.[0] ?? '/images/travel-listing-fallback.png',
       price: item.Tour.pricePerPerson ?? 0,
       type: 'tour',
     }
@@ -135,8 +119,8 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        target: item.type === 'hotel' ? 'HOTEL' : 'TOUR',
-        ...(item.type === 'hotel' ? { hotelSlug: item.slug } : { tourSlug: item.slug }),
+        target: 'TOUR',
+        tourSlug: item.slug,
       }),
     })
       .then(async (response) => {
@@ -157,7 +141,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
       })
   }
 
-  const removeFromWishlist = (slug: string, type: 'hotel' | 'tour') => {
+  const removeFromWishlist = (slug: string, type: 'tour') => {
     const removedItem = wishlist.find((item) => item.slug === slug && item.type === type)
     if (!removedItem) return
     showNotice({ message: 'Removed from wishlist' })
@@ -174,7 +158,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
     })
   }
 
-  const isInWishlist = (slug: string, type: 'hotel' | 'tour') => {
+  const isInWishlist = (slug: string, type: 'tour') => {
     return wishlist.some((item) => item.slug === slug && item.type === type)
   }
 

@@ -10,8 +10,8 @@ import Checkbox from "@/components/ui/Checkbox"
 import SocialAuthButton from "@/components/ui/SocialAuthButton"
 import { useAuth } from "@/contexts/AuthContext"
 
-const propertyTypes = ["All travel products", "Hotel or homestay", "Tour operator", "Car and bike rental", "Activity host"]
-const hostProducts = ["Hotels", "Tours", "Cars & bikes", "Activities"]
+const propertyTypes = ["All travel products", "Tour operator", "Car and bike rental", "Activity host"]
+const hostProducts = ["Tours", "Cars & bikes", "Activities"]
 
 export default function HostSignupForm() {
   const router = useRouter()

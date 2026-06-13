@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BarChart3, CalendarCheck, CheckCircle2, ChevronDown, Clock, Filter, Hotel, IndianRupee, Users } from "lucide-react"
+import { BarChart3, CalendarCheck, CheckCircle2, ChevronDown, Clock, Filter, IndianRupee, MapPinned, Users } from "lucide-react"
 import { HostEmptyState, HostPage, HostPill, HostSection, HostStatCard } from "@/components/host/HostUI"
 import Spinner from "@/components/ui/Spinner"
 import type { HostBooking as Booking, HostBookingActionProps } from "@/types/host-pages"
@@ -93,7 +93,6 @@ export default function BookingsPage() {
           ]} />
           <SelectFilter value={filterType} onChange={setFilterType} options={[
             ["all", "All types"],
-            ["hotel", "Hotels"],
             ["tour", "Tours"],
           ]} />
           <span className="ml-auto rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
@@ -112,8 +111,7 @@ export default function BookingsPage() {
                 <thead className="border-b border-slate-100 bg-slate-50 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                   <tr>
                     <th className="px-5 py-3 text-left">Guest</th>
-                    <th className="px-5 py-3 text-left">Property</th>
-                    <th className="px-5 py-3 text-left">Rooms</th>
+                    <th className="px-5 py-3 text-left">Trip</th>
                     <th className="px-5 py-3 text-left">Dates</th>
                     <th className="px-5 py-3 text-left">Guests</th>
                     <th className="px-5 py-3 text-left">Amount</th>
@@ -159,12 +157,9 @@ function BookingRow({ booking, onStatusChange }: HostBookingActionProps) {
       </td>
       <td className="px-5 py-4">
         <div className="flex items-center gap-2">
-          <Hotel className="h-4 w-4 shrink-0 text-slate-400" />
-          <span className="font-semibold text-slate-800">{booking.hotel?.name ?? booking.tour?.name ?? "-"}</span>
+          <MapPinned className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="font-semibold text-slate-800">{booking.tour?.name ?? "-"}</span>
         </div>
-      </td>
-      <td className="px-5 py-4">
-        <RoomInventory rooms={booking.rooms} />
       </td>
       <td className="px-5 py-4">{formatBookingDates(booking)}</td>
       <td className="px-5 py-4">
@@ -206,7 +201,7 @@ function BookingCard({ booking, onStatusChange }: HostBookingActionProps) {
           </span>
           <div>
             <p className="font-bold text-slate-950">{booking.guest.name}</p>
-            <p className="text-xs text-slate-500">{booking.hotel?.name ?? booking.tour?.name ?? "-"}</p>
+            <p className="text-xs text-slate-500">{booking.tour?.name ?? "-"}</p>
           </div>
         </div>
         <HostPill tone={cfg.tone}>{cfg.label}</HostPill>
@@ -214,9 +209,6 @@ function BookingCard({ booking, onStatusChange }: HostBookingActionProps) {
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-600">
         <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{booking.numberOfGuests} guests</span>
         <span className="font-bold text-slate-950">{formatCurrency(booking.totalPrice)}</span>
-      </div>
-      <div className="mt-3">
-        <RoomInventory rooms={booking.rooms} />
       </div>
       <div className="mt-3">
         <SelectFilter

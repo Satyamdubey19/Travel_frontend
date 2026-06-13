@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Wishlist lets authenticated users save hotels, tours, rentals, and activities and view them on the wishlist page.
+Wishlist lets authenticated users save tours, rentals, and activities and view them on the wishlist page.
 
 ## Source Files
 
@@ -17,7 +17,6 @@ lib/axios.ts
 ## Supported Targets
 
 ```text
-HOTEL
 TOUR
 RENTAL
 ACTIVITY

@@ -11,7 +11,7 @@ export default function BrandsSection({ brands }: BrandsSectionProps) {
     <section className="space-y-8 py-16">
       <div className="text-center">
         <p className="text-sm uppercase tracking-[0.35em] text-slate-500">Brands</p>
-        <h2 className="mt-3 text-4xl font-black text-center text-black">Select from premium hotel brands worldwide</h2>
+        <h2 className="mt-3 text-4xl font-black text-center text-black">Select from premium travel partners worldwide</h2>
       </div>
       <div className="grid gap-6 md:grid-cols-5">
         {brands.map((brand) => (

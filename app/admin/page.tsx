@@ -100,7 +100,7 @@ export default function AdminDashboard() {
         {
           id: '1',
           type: 'kyc',
-          description: 'New business identity package submitted by John Hotel Group',
+          description: 'New business identity package submitted by John Travel Group',
           timestamp: new Date().toISOString(),
           status: 'pending',
           href: '/admin/kyc',
@@ -116,7 +116,7 @@ export default function AdminDashboard() {
         {
           id: '3',
           type: 'payout',
-          description: 'Mumbai Hotels Ltd payout batch requires secondary review',
+          description: 'Mumbai Travel Ltd payout batch requires secondary review',
           timestamp: new Date(Date.now() - 1000 * 60 * 115).toISOString(),
           status: 'pending',
           href: '/admin/payouts',

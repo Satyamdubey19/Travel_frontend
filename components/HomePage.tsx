@@ -48,28 +48,28 @@ export default function HomePage({ data }: HomePageProps) {
             <div className="mb-8 flex items-center justify-between">
               <div>
                 <p className="text-sm uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-                  Featured Hotels
+                  Featured Trips
                 </p>
-                <h2 className="text-3xl font-bold">Popular stays</h2>
+                <h2 className="text-3xl font-bold">Popular trips</h2>
               </div>
             </div>
             <div className="grid gap-6 md:grid-cols-3">
-              {data.featuredHotels.map((hotel) => (
+              {data.featuredTrips.map((trip) => (
                 <article
-                  key={hotel.id}
+                  key={trip.id}
                   className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-zinc-950"
                 >
                   <div className="h-44 bg-gradient-to-br from-slate-900 via-slate-700 to-slate-500 p-6 text-white">
-                    <p className="text-sm uppercase tracking-[0.25em] opacity-80">{hotel.location}</p>
-                    <h3 className="mt-6 text-2xl font-semibold">{hotel.name}</h3>
+                    <p className="text-sm uppercase tracking-[0.25em] opacity-80">{trip.location}</p>
+                    <h3 className="mt-6 text-2xl font-semibold">{trip.name}</h3>
                   </div>
                   <div className="space-y-4 p-6">
                     <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      {hotel.description}
+                      {trip.description}
                     </p>
                     <div className="flex items-center justify-between gap-3 text-sm font-semibold">
-                      <span>Rating: {hotel.rating.toFixed(1)}</span>
-                      <span className="text-slate-900 dark:text-slate-50">{hotel.price}</span>
+                      <span>Rating: {trip.rating.toFixed(1)}</span>
+                      <span className="text-slate-900 dark:text-slate-50">{trip.price}</span>
                     </div>
                   </div>
                 </article>

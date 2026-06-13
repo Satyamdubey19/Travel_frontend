@@ -50,7 +50,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold text-slate-900 mb-4">4. Booking and Reservations</h2>
             <p className="mb-4">
-              GetHotels acts as an intermediary between users and hotel partners. We are not responsible for the quality, accuracy, or availability of accommodations offered by our partners. All bookings are subject to the terms and conditions of the individual properties.
+              GetHotels acts as an intermediary between users and travel partners. We are not responsible for the quality, accuracy, or availability of services offered by our partners. All bookings are subject to the terms and conditions of the individual providers.
             </p>
           </section>
 
