@@ -14,6 +14,7 @@ import { removeTraveler, setActiveStep, setBookingResult, setDepartureBatch, ups
 import type { TourBookingWizardStep } from "@/types/tour-booking"
 import type { TourTravelerInput } from "@/validators/tour-booking.validators"
 import TravelerFormCard from "./TravelerFormCard"
+import PolicyModal from "@/components/policy/PolicyModal"
 
 type TourBookingWizardProps = {
   open: boolean
@@ -23,6 +24,11 @@ type TourBookingWizardProps = {
     name: string
     email: string
     phone: string
+  }
+  safety: {
+    riskLevel: string
+    riskDisclosure: string
+    minimumAge: number
   }
 }
 
@@ -112,13 +118,17 @@ function loadRazorpayScript() {
   return razorpayScriptPromise
 }
 
-export default function TourBookingWizard({ contact, onOpenChange, open, tourIdOrSlug }: TourBookingWizardProps) {
+export default function TourBookingWizard({ contact, onOpenChange, open, safety, tourIdOrSlug }: TourBookingWizardProps) {
   const dispatch = useAppDispatch()
   const wizard = useAppSelector((state) => state.tourBookingWizard)
   const batches = useTourBatches(tourIdOrSlug)
   const createIntent = useCreateTourBookingIntent(tourIdOrSlug)
   const [contactDraft, setContactDraft] = useState(contact)
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false)
+  const [safetyPolicyAgreed, setSafetyPolicyAgreed] = useState(false)
+  const [activeModalPolicy, setActiveModalPolicy] = useState<null | "TRAVELER_SAFETY_POLICY" | "CANCELLATION_POLICY">(null)
   const activeStepIndex = flowSteps.indexOf(wizard.activeStep)
   const progressPercent = Math.max(8, ((activeStepIndex + 1) / flowSteps.length) * 100)
   const selectedBatch = (batches.data ?? []).find((batch) => batch.id === wizard.departureBatchId)
@@ -139,6 +149,14 @@ export default function TourBookingWizard({ contact, onOpenChange, open, tourIdO
       toast.error("Add at least one traveler")
       return
     }
+    if (!riskAcknowledged) {
+      toast.error("Review and acknowledge the tour risk disclosure before continuing")
+      return
+    }
+    if (!safetyPolicyAgreed) {
+      toast.error("Please review and accept the Traveler Safety Guidelines and Cancellation Policy")
+      return
+    }
     try {
       setIsProcessingPayment(true)
       dispatch(setActiveStep("payment"))
@@ -148,7 +166,8 @@ export default function TourBookingWizard({ contact, onOpenChange, open, tourIdO
         contactName: contactDraft.name,
         contactEmail: contactDraft.email,
         contactPhone: contactDraft.phone,
-        idempotencyKey: `${tourIdOrSlug}-${Date.now()}`,
+        idempotencyKey,
+        riskAcknowledged: true,
       })
 
       if (result.status === "WAITLISTED") {
@@ -237,7 +256,13 @@ export default function TourBookingWizard({ contact, onOpenChange, open, tourIdO
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (!nextOpen) {
+        setIdempotencyKey(crypto.randomUUID())
+        setRiskAcknowledged(false)
+      }
+      onOpenChange(nextOpen)
+    }}>
       <DialogContent
         overlayClassName="bg-slate-950/40 duration-200 supports-backdrop-filter:backdrop-blur-md"
         style={{
@@ -366,6 +391,46 @@ export default function TourBookingWizard({ contact, onOpenChange, open, tourIdO
               </motion.div>
             ) : (
               <motion.div key="travelers" variants={panelMotion} initial="initial" animate="animate" exit="exit" className="space-y-5">
+                <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-amber-950 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-black uppercase tracking-[0.16em]">Required risk review</p>
+                    <span className="rounded-full bg-amber-900 px-3 py-1 text-[10px] font-black text-white">{safety.riskLevel.replaceAll("_", " ")} risk · age {safety.minimumAge}+</span>
+                  </div>
+                  <p className="mt-3 text-sm leading-6">{safety.riskDisclosure}</p>
+                  <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-300 bg-white/70 p-3 text-sm font-bold leading-5">
+                    <input type="checkbox" checked={riskAcknowledged} onChange={(event) => setRiskAcknowledged(event.target.checked)} className="mt-0.5 size-5 accent-amber-800" />
+                    <span>I have read this disclosure and will confirm that every traveler meets the stated eligibility and minimum age. This acknowledgment does not waive legal rights.</span>
+                  </label>
+
+                  <label className="mt-2.5 flex cursor-pointer items-start gap-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-3 text-xs font-bold leading-5 text-violet-950">
+                    <input type="checkbox" checked={safetyPolicyAgreed} onChange={(event) => setSafetyPolicyAgreed(event.target.checked)} className="mt-0.5 size-4 accent-violet-700" />
+                    <span>
+                      I have reviewed and agree to the{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setActiveModalPolicy("TRAVELER_SAFETY_POLICY")
+                        }}
+                        className="underline font-extrabold text-violet-700 hover:text-violet-950"
+                      >
+                        Traveler Safety Guidelines
+                      </button>{" "}
+                      and{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setActiveModalPolicy("CANCELLATION_POLICY")
+                        }}
+                        className="underline font-extrabold text-violet-700 hover:text-violet-950"
+                      >
+                        Cancellation & Refund Policy
+                      </button>
+                      .
+                    </span>
+                  </label>
+                </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Current step</p>
                   <div className="mt-2 flex items-center justify-between gap-3">
@@ -429,7 +494,7 @@ export default function TourBookingWizard({ contact, onOpenChange, open, tourIdO
                   />
                 ))}
                 <div className="sticky bottom-0 -mx-4 flex justify-end border-t border-slate-200 bg-white/95 px-4 py-4 shadow-[0_-18px_40px_rgba(15,23,42,0.08)] backdrop-blur sm:-mx-6 sm:px-6">
-                  <Button type="button" disabled={createIntent.isPending || isProcessingPayment} onClick={submit} className="h-11 rounded-2xl bg-slate-950 px-6 font-black text-white shadow-lg shadow-slate-200 hover:bg-teal-700">
+                  <Button type="button" disabled={createIntent.isPending || isProcessingPayment || !riskAcknowledged || !safetyPolicyAgreed} onClick={submit} className="h-11 rounded-2xl bg-slate-950 px-6 font-black text-white shadow-lg shadow-slate-200 hover:bg-teal-700">
                     {createIntent.isPending || isProcessingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                     {isProcessingPayment ? "Opening payment..." : "Validate seats"}
                   </Button>
@@ -438,6 +503,12 @@ export default function TourBookingWizard({ contact, onOpenChange, open, tourIdO
             )}
           </AnimatePresence>
         </div>
+
+        <PolicyModal
+          isOpen={Boolean(activeModalPolicy)}
+          policyType={activeModalPolicy || "TRAVELER_SAFETY_POLICY"}
+          onClose={() => setActiveModalPolicy(null)}
+        />
       </DialogContent>
     </Dialog>
   )

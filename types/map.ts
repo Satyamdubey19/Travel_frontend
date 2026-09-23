@@ -1,3 +1,1 @@
-export type MapPreviewProps = any
-export type MapModalProps = any
-export type MapSectionProps = any
+export type Coordinates = { latitude: number; longitude: number }

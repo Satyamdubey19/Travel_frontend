@@ -1,64 +1,27 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import api from "@/lib/axios"
+import { useCallback, useEffect, useState } from "react"
+import { CheckCircle2, Clock3, Search, ShieldCheck, XCircle } from "lucide-react"
+import api, { getApiErrorMessage } from "@/lib/axios"
 
-type RentalRow = {
-  id: string
-  title: string
-  city?: string | null
-  status?: string
-  isActive?: boolean
-  vehicleType?: string
-}
+type RentalRow = { id: string; type: "rental"; title: string; ownerName: string; city: string; status: string; isActive: boolean; isApproved: boolean; price: number; inventoryLabel: string; bookings: number; reviews: number; createdAt: string }
+const statuses = ["PENDING_REVIEW","ACTIVE","REJECTED","PAUSED","ARCHIVED","all"]
 
 export default function AdminRentalsPage() {
   const [rows, setRows] = useState<RentalRow[]>([])
+  const [status, setStatus] = useState("PENDING_REVIEW")
+  const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    api
-      .get("/rental")
-      .then(({ data }) => setRows(Array.isArray(data.data) ? data.data : []))
-      .finally(() => setLoading(false))
-  }, [])
-
-  return (
-    <main className="p-6 lg:p-8">
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-700">Admin</p>
-        <h1 className="mt-2 text-3xl font-black text-slate-950">Rentals</h1>
-        <p className="mt-2 text-sm text-slate-600">Review active travel rental inventory.</p>
-      </div>
-
-      <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        {loading ? (
-          <div className="p-6 text-sm text-slate-500">Loading rentals...</div>
-        ) : rows.length === 0 ? (
-          <div className="p-6 text-sm text-slate-500">No rentals found.</div>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-[0.16em] text-slate-500">
-              <tr>
-                <th className="px-5 py-4">Rental</th>
-                <th className="px-5 py-4">City</th>
-                <th className="px-5 py-4">Type</th>
-                <th className="px-5 py-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="px-5 py-4 font-semibold text-slate-950">{row.title}</td>
-                  <td className="px-5 py-4 text-slate-600">{row.city ?? "-"}</td>
-                  <td className="px-5 py-4 text-slate-600">{row.vehicleType ?? "-"}</td>
-                  <td className="px-5 py-4 text-slate-600">{row.status ?? (row.isActive ? "ACTIVE" : "PAUSED")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </main>
-  )
+  const [acting, setActing] = useState<string | null>(null)
+  const [error, setError] = useState("")
+  const [reasons, setReasons] = useState<Record<string,string>>({})
+  const load = useCallback(async () => { setLoading(true); setError(""); try { const params = new URLSearchParams({ type:"rental",status,search:query,limit:"100" }); const {data}=await api.get(`/admin/listings?${params}`); setRows(data.data ?? []) } catch (requestError) { setError(getApiErrorMessage(requestError,"Rental moderation queue could not be loaded")) } finally { setLoading(false) } },[query,status])
+  useEffect(()=>{void load()},[load])
+  const decide = async (row: RentalRow, nextStatus: string) => { const reason=reasons[row.id]?.trim(); if(nextStatus!=="ACTIVE" && (!reason || reason.length<5)){setError("Add a clear reason of at least 5 characters before rejecting, pausing or archiving.");return} setActing(row.id);setError("");try{await api.patch(`/admin/listings/rental/${row.id}`,{status:nextStatus,isActive:nextStatus==="ACTIVE",reason:reason||"Rental passed marketplace moderation"});setRows((items)=>items.filter((item)=>item.id!==row.id))}catch(requestError){setError(getApiErrorMessage(requestError,"Moderation decision failed"))}finally{setActing(null)} }
+  return <main className="min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,.1),transparent_30%),#f8fafc] p-4 sm:p-7"><div className="mx-auto max-w-7xl space-y-6">
+    <header className="rounded-[2rem] bg-slate-950 p-7 text-white shadow-2xl"><p className="text-xs font-black uppercase tracking-[.2em] text-cyan-300">Trust operations</p><h1 className="mt-2 text-3xl font-black">Rental moderation</h1><p className="mt-2 max-w-3xl text-sm text-slate-300">Review every host submission before it reaches travelers. Decisions are written to the listing audit history.</p></header>
+    <section className="rounded-[2rem] border border-white bg-white/85 p-4 shadow-sm"><div className="flex flex-col gap-3 lg:flex-row"><label className="relative flex-1"><Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400"/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search rental, host or city" className="h-12 w-full rounded-2xl border border-slate-200 pl-12 pr-4" /></label><button onClick={()=>void load()} className="rounded-2xl bg-slate-950 px-6 text-sm font-black text-white">Search</button></div><div className="mt-4 flex gap-2 overflow-x-auto">{statuses.map((item)=><button key={item} onClick={()=>setStatus(item)} className={`rounded-full px-4 py-2 text-xs font-black ${status===item?"bg-cyan-600 text-white":"bg-slate-100 text-slate-600"}`}>{item.replaceAll("_"," ")}</button>)}</div></section>
+    {error&&<p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 font-semibold text-rose-700">{error}</p>}
+    {loading?<div className="space-y-3">{[1,2,3].map((value)=><div key={value} className="h-36 animate-pulse rounded-3xl bg-white" />)}</div>:rows.length===0?<div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-12 text-center"><ShieldCheck className="mx-auto size-10 text-emerald-500"/><h2 className="mt-4 text-xl font-black">Queue is clear</h2><p className="mt-2 text-sm text-slate-500">No rentals match this moderation view.</p></div>:<section className="space-y-4">{rows.map((row)=><article key={row.id} className="rounded-[2rem] border border-white bg-white/90 p-5 shadow-[0_18px_50px_rgba(15,23,42,.07)]"><div className="grid gap-5 lg:grid-cols-[1fr_auto]"><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-black text-cyan-800">{row.status.replaceAll("_"," ")}</span><span className="text-xs font-semibold text-slate-400">Submitted {new Date(row.createdAt).toLocaleDateString("en-IN")}</span></div><h2 className="mt-3 text-xl font-black">{row.title}</h2><p className="mt-1 text-sm text-slate-500">{row.ownerName} · {row.city}</p><div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-slate-600"><span className="rounded-xl bg-slate-50 px-3 py-2">₹{Number(row.price).toLocaleString("en-IN")}/day</span><span className="rounded-xl bg-slate-50 px-3 py-2">{row.inventoryLabel}</span><span className="rounded-xl bg-slate-50 px-3 py-2">{row.bookings} bookings</span><span className="rounded-xl bg-slate-50 px-3 py-2">{row.reviews} reviews</span></div><input value={reasons[row.id]??""} onChange={(e)=>setReasons((current)=>({...current,[row.id]:e.target.value}))} placeholder="Decision notes / required change reason" className="mt-4 h-11 w-full max-w-2xl rounded-xl border border-slate-200 px-3 text-sm" /></div><div className="flex flex-wrap content-start gap-2 lg:w-72">{row.status!=="ACTIVE"&&<button disabled={acting===row.id} onClick={()=>void decide(row,"ACTIVE")} className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white"><CheckCircle2 className="size-4"/>Approve</button>}<button disabled={acting===row.id} onClick={()=>void decide(row,"REJECTED")} className="inline-flex h-10 items-center gap-2 rounded-xl bg-rose-600 px-4 text-xs font-black text-white"><XCircle className="size-4"/>Reject</button><button disabled={acting===row.id} onClick={()=>void decide(row,"PAUSED")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 text-xs font-black text-amber-800"><Clock3 className="size-4"/>Pause</button></div></div></article>)}</section>}
+  </div></main>
 }

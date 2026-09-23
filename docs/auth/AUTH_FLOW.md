@@ -44,29 +44,27 @@ GET /api/auth/me returns canonical user state.
 
 ```text
 AuthProvider mounts
-  -> read localStorage.user for quick UI hydration
   -> call GET /api/auth/me
-  -> if backend returns user, replace local state
-  -> if backend fails and local user exists, keep local dev fallback state
-  -> if no local user and backend fails, user=null
+  -> if backend returns user, store the sanitized response in React memory
+  -> if backend fails or returns unauthorized, user=null
 ```
 
 Production note:
 
 ```text
-Do not treat localStorage.user as secure auth.
-Backend /api/auth/me is the source of truth.
+Browser storage is not used for authentication.
+Backend /api/auth/me is the only browser-session source of truth.
 ```
 
 ## Login Flow
 
 ```text
 LoginForm
-  -> AuthContext.login(email, password, expectedRole?)
+  -> AuthContext.login(email, password)
   -> POST /api/auth/login
-  -> backend verifies email/password/role
+  -> backend verifies email/password and current account state
   -> backend sets httpOnly token cookie
-  -> frontend stores sanitized user in localStorage
+  -> frontend stores sanitized user in React memory
   -> redirect based on returned role
 ```
 
@@ -83,8 +81,6 @@ Expected login errors:
 ```text
 Incorrect email or password
 Please verify your email before logging in
-This account does not have host access
-This account does not have admin access
 Too many requests. Please try again later.
 Invalid request origin
 ```
@@ -151,21 +147,15 @@ Backend requires Google `email_verified=true`.
 
 ```text
 logout()
-  -> remove localStorage.user
+  -> clear in-memory user state
   -> POST /api/auth/logout
   -> signOut({ redirect: false })
   -> UI returns to unauthenticated state
 ```
 
-## Local Fallback Accounts
+## Host-intent links
 
-`AuthContext` currently includes browser localStorage fallback accounts for development/demo continuity.
-
-```text
-This is not production authentication.
-Do not rely on local fallback roles for server-side access.
-Clear site storage if local state looks stale.
-```
+Host-facing links may append `intent=host` to improve the next-screen copy and route an ordinary USER back to the host application after sign-in. This is not a role request, is never sent to `POST /api/auth/login`, and cannot grant Host Studio access.
 
 ## Testing Checklist
 
@@ -176,6 +166,5 @@ Verified login stores user and hydrates /api/auth/me.
 Host signup does not open /host unless backend grants HOST.
 becomeHost creates pending profile but does not force HOST locally.
 Logout clears local user and backend cookie.
-Local stale user is replaced by /api/auth/me response.
-API down fallback only works as dev/demo behavior.
+No browser-stored role or demo account can authenticate a user when the API is unavailable.
 ```

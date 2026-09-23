@@ -4,7 +4,6 @@ import { useWishlist } from '@/contexts/WishlistContext'
 import Header from '@/components/layout/Header/Header'
 import Footer from '@/components/layout/Footer/Footer'
 import Link from 'next/link'
-import Image from 'next/image'
 
 export default function WishlistPage() {
   const { wishlist, removeFromWishlist, clearWishlist } = useWishlist()

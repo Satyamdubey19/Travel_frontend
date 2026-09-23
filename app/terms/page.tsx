@@ -1,107 +1,307 @@
-'use client';
+"use client"
 
-import Link from 'next/link';
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import {
+  ShieldCheck,
+  Scale,
+  FileText,
+  Users,
+  Building2,
+  Calendar,
+  Sparkles,
+  ArrowLeft,
+  Printer,
+  CheckCircle2,
+} from "lucide-react"
+import api from "@/lib/axios"
 
-export default function TermsPage() {
+interface PolicyData {
+  id: string
+  type: string
+  title: string
+  version: string
+  summary: string | null
+  content: string
+  effectiveDate: string
+}
+
+const TABS = [
+  { id: "TERMS_OF_SERVICE", label: "Terms of Service", icon: Scale, description: "Marketplace terms, booking contracts, and liability limits" },
+  { id: "PRIVACY_POLICY", label: "Privacy Policy", icon: ShieldCheck, description: "DPDP Act 2023 compliance, data rights, and encryption" },
+  { id: "HOST_SAFETY_AGREEMENT", label: "Host Safety Agreement", icon: Building2, description: "Host obligations, safety standards, and KYC requirements" },
+  { id: "TRAVELER_SAFETY_POLICY", label: "Traveler Safety Guidelines", icon: Users, description: "Traveler conduct, substance rules, and emergency guidelines" },
+  { id: "CANCELLATION_POLICY", label: "Cancellation & Refunds", icon: FileText, description: "Transparent refund schedules, tiers, and force majeure" },
+]
+
+const FALLBACK_POLICIES: Record<string, PolicyData> = {
+  TERMS_OF_SERVICE: {
+    id: "tos-fallback",
+    type: "TERMS_OF_SERVICE",
+    title: "Terms of Service & Platform User Agreement",
+    version: "1.0",
+    summary: "Binding agreement governing marketplace use, booking transactions, and liability limitations.",
+    effectiveDate: "2026-04-01T00:00:00.000Z",
+    content: `# 1. Acceptance of Terms
+By accessing or using the Travels Pro marketplace (the "Platform"), you agree to be bound by these Terms of Service and all incorporated policies.
+
+# 2. Marketplace Role
+Travels Pro operates as an online marketplace technology provider facilitating direct contracts between Travelers and verified independent Hosts. Travels Pro is not an operator or common carrier unless explicitly designated in writing.
+
+# 3. Booking & Payment Execution
+All booking payments are processed securely through certified PCI-DSS Level 1 payment partners. Payouts to Hosts are executed strictly following safety custody holding periods after trip commencement.
+
+# 4. Dispute Resolution
+Any dispute arising out of or in connection with this agreement shall be governed by the laws of India, subject to arbitration in accordance with the Arbitration and Conciliation Act, 1996.`,
+  },
+  PRIVACY_POLICY: {
+    id: "privacy-fallback",
+    type: "PRIVACY_POLICY",
+    title: "Privacy Policy & DPDP Act 2023 Compliance",
+    version: "1.0",
+    summary: "Our commitment to data protection under the Digital Personal Data Protection Act, 2023.",
+    effectiveDate: "2026-04-01T00:00:00.000Z",
+    content: `# 1. Legislative Compliance
+Travels Pro complies with the Digital Personal Data Protection Act, 2023 (DPDP Act) of India and applicable global standards.
+
+# 2. Data We Collect
+We collect personal information necessary to fulfill verified bookings, perform host KYC compliance, and ensure passenger physical safety.
+
+# 3. End-to-End Encryption
+Sensitive financial credentials and national identity documents are encrypted at rest using industry standard AES-256-GCM algorithms.
+
+# 4. Your Rights
+You possess the statutory right to access your stored data, request rectification of inaccurate records, or demand erasure subject to mandatory tax retention.`,
+  },
+  HOST_SAFETY_AGREEMENT: {
+    id: "host-safety-fallback",
+    type: "HOST_SAFETY_AGREEMENT",
+    title: "Host Safety Agreement & Operational Standards",
+    version: "1.0",
+    summary: "Mandatory safety verification, licensing, and traveler protection standards for hosts.",
+    effectiveDate: "2026-04-01T00:00:00.000Z",
+    content: `# 1. Verification & Identity Authenticity
+All Hosts must successfully complete identity authentication, local address verification, and payout authorization prior to listing tours or vehicles.
+
+# 2. Safety Equipment & Emergency Preparedness
+Hosts conducting high-altitude expeditions, water activities, or motor rentals must maintain certified safety equipment, first-aid resources, and emergency protocol documentation.
+
+# 3. Zero Tolerance for Harassment
+Travels Pro maintains a zero-tolerance policy against physical, verbal, or discriminatory harassment. Violations result in immediate suspension.`,
+  },
+  TRAVELER_SAFETY_POLICY: {
+    id: "traveler-safety-fallback",
+    type: "TRAVELER_SAFETY_POLICY",
+    title: "Traveler Safety Guidelines & Code of Conduct",
+    version: "1.0",
+    summary: "Guidelines ensuring safe, respectful, and responsible participation for travelers.",
+    effectiveDate: "2026-04-01T00:00:00.000Z",
+    content: `# 1. Physical Fitness & Medical Disclosure
+Travelers must review itinerary difficulty ratings and disclose pertinent medical conditions to Hosts prior to high-risk excursions.
+
+# 2. Adherence to Guide Directives
+For the safety of the entire group, travelers must follow instructions issued by certified guides regarding trails, weather shelters, and equipment.
+
+# 3. Environmental Stewardship
+Travelers must practice "Leave No Trace" ethics, respect wildlife, and honor local cultural customs.`,
+  },
+  CANCELLATION_POLICY: {
+    id: "cancellation-fallback",
+    type: "CANCELLATION_POLICY",
+    title: "Standard Cancellation & Refund Policy",
+    version: "1.0",
+    summary: "Transparent cancellation tiers, refund timelines, and force majeure weather exemptions.",
+    effectiveDate: "2026-04-01T00:00:00.000Z",
+    content: `# 1. Standard Cancellation Tiers
+- **More than 48 hours prior to start**: 100% refund of booking amount minus standard transaction gateway charges.
+- **Between 24 and 48 hours prior to start**: 50% refund.
+- **Less than 24 hours or No-Show**: Non-refundable.
+
+# 2. Host-Initiated Cancellations
+If a host cancels an authorized booking, the traveler receives an immediate 100% refund with full booking assistance.
+
+# 3. Weather Emergencies & Force Majeure
+Severe weather advisories or road blockages verified by local authorities qualify for full refund or free rescheduling.`,
+  },
+}
+
+export default function TermsAndPoliciesPage() {
+  const [policies, setPolicies] = useState<Record<string, PolicyData>>(FALLBACK_POLICIES)
+  const [selectedType, setSelectedType] = useState("TERMS_OF_SERVICE")
+
+  useEffect(() => {
+    let ignore = false
+    void api
+      .get<{ data?: { policies?: PolicyData[] } }>("/policies/active")
+      .then((res) => {
+        if (!ignore && res.data?.data?.policies && Array.isArray(res.data.data.policies)) {
+          const map: Record<string, PolicyData> = { ...FALLBACK_POLICIES }
+          for (const p of res.data.data.policies) {
+            map[p.type] = p
+          }
+          setPolicies(map)
+        }
+      })
+      .catch(() => {
+        // Use fallback policies seamlessly
+      })
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  const currentPolicy = policies[selectedType] || FALLBACK_POLICIES[selectedType]
+
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-4xl mx-auto px-4 py-12 md:py-16">
-        {/* Header */}
-        <div className="mb-12">
-          <Link href="/" className="inline-block mb-8">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-lg font-bold text-white shadow-lg">
-              GH
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto space-y-8">
+        {/* Navigation & Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Travels Pro
+          </Link>
+          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-medium border border-emerald-200 dark:border-emerald-800">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              DPDP Act 2023 Verified
+            </span>
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1 hover:text-slate-800 dark:hover:text-white transition"
+              title="Print Policy"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Print
+            </button>
+          </div>
+        </div>
+
+        {/* Hero Title */}
+        <div className="text-center space-y-3 max-w-2xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold tracking-wide uppercase">
+            <Sparkles className="h-3.5 w-3.5" />
+            Legal & Trust Framework
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-950 dark:text-white">
+            Policies, Terms & Safety Standards
+          </h1>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
+            Transparent legal safeguards for travelers, certified hosts, and marketplace partners across India and abroad.
+          </p>
+        </div>
+
+        {/* Policy Tab Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 bg-slate-200/60 dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          {TABS.map((tab) => {
+            const Icon = tab.icon
+            const isSelected = selectedType === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setSelectedType(tab.id)}
+                className={`flex flex-col items-center justify-center p-3 rounded-xl text-xs font-bold transition-all text-center gap-1.5 ${
+                  isSelected
+                    ? "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-sm shadow-slate-200/50 dark:shadow-none"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/40"
+                }`}
+              >
+                <Icon className={`h-4 w-4 ${isSelected ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`} />
+                <span className="line-clamp-1">{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Selected Policy Content Card */}
+        {currentPolicy && (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl shadow-slate-200/20 dark:shadow-none p-6 sm:p-10 space-y-8">
+            {/* Document Meta Header */}
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-6">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5">
+                  <span className="px-2.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-400 text-xs font-bold font-mono">
+                    Version {currentPolicy.version}
+                  </span>
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Effective: {new Date(currentPolicy.effectiveDate).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white pt-1">
+                  {currentPolicy.title}
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Active Policy
+                </span>
+              </div>
             </div>
-          </Link>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-2">Terms & Conditions</h1>
-          <p className="text-slate-600">Last updated: April 12, 2026</p>
-        </div>
 
-        {/* Content */}
-        <div className="space-y-8 text-slate-700">
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">1. Acceptance of Terms</h2>
-            <p className="mb-4">
-              By accessing and using GetHotels, you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
-            </p>
-          </section>
+            {/* Executive Summary Callout */}
+            {currentPolicy.summary && (
+              <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 flex items-start gap-3.5 text-emerald-950 dark:text-emerald-200">
+                <Sparkles className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div className="text-sm font-medium leading-relaxed">
+                  <span className="font-bold block text-xs uppercase tracking-wider text-emerald-800 dark:text-emerald-400 mb-0.5">
+                    Executive Summary
+                  </span>
+                  {currentPolicy.summary}
+                </div>
+              </div>
+            )}
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">2. User Accounts</h2>
-            <p className="mb-4">
-              When you create an account with GetHotels, you must provide information that is accurate, complete, and current at all times. You are responsible for maintaining the confidentiality of your account and password and for restricting access to your computer.
-            </p>
-          </section>
+            {/* Document Body */}
+            <div className="prose prose-slate dark:prose-invert max-w-none text-sm sm:text-base leading-relaxed space-y-6">
+              {currentPolicy.content.split("\n\n").map((section, idx) => {
+                if (section.startsWith("# ")) {
+                  return (
+                    <h3 key={idx} className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white pt-3 border-t border-slate-100 dark:border-slate-800">
+                      {section.replace("# ", "")}
+                    </h3>
+                  )
+                }
+                if (section.startsWith("## ")) {
+                  return (
+                    <h4 key={idx} className="text-base sm:text-lg font-bold text-slate-900 dark:text-white pt-2">
+                      {section.replace("## ", "")}
+                    </h4>
+                  )
+                }
+                return (
+                  <p key={idx} className="text-slate-700 dark:text-slate-300 whitespace-pre-line">
+                    {section}
+                  </p>
+                )
+              })}
+            </div>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">3. Use License</h2>
-            <p className="mb-4">
-              Permission is granted to temporarily download one copy of the materials (information or software) on GetHotels's web site for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not:
-            </p>
-            <ul className="list-disc list-inside space-y-2 ml-4">
-              <li>Modify or copy the materials</li>
-              <li>Use the materials for any commercial purpose or for any public display</li>
-              <li>Attempt to decompile or reverse engineer any software contained on the site</li>
-              <li>Remove any copyright or other proprietary notations from the materials</li>
-              <li>Transfer the materials to another person or "mirror" the materials on any other server</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">4. Booking and Reservations</h2>
-            <p className="mb-4">
-              GetHotels acts as an intermediary between users and travel partners. We are not responsible for the quality, accuracy, or availability of services offered by our partners. All bookings are subject to the terms and conditions of the individual providers.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">5. Cancellation Policy</h2>
-            <p className="mb-4">
-              Cancellation policies vary by property and are displayed at the time of booking. Users are responsible for reviewing and accepting the specific cancellation terms before confirming their reservation.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">6. Limitation of Liability</h2>
-            <p className="mb-4">
-              In no event shall GetHotels or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the materials on GetHotels's web site.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">7. Accuracy of Materials</h2>
-            <p className="mb-4">
-              The materials appearing on GetHotels's web site could include technical, typographical, or photographic errors. GetHotels does not warrant that any of the materials on our web site are accurate, complete, or current.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">8. Modifications</h2>
-            <p className="mb-4">
-              GetHotels may revise these terms of service for our web site at any time without notice. By using this web site, you are agreeing to be bound by the then current version of these terms of service.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">9. Contact Us</h2>
-            <p className="mb-4">
-              If you have any questions about these Terms & Conditions, please contact us at:
-            </p>
-            <p className="text-slate-600">
-              Email: support@gethotels.com<br />
-              Address: GetHotels Inc., 123 Travel Street, Adventure City, AC 12345
-            </p>
-          </section>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-12 pt-8 border-t border-slate-200 text-center text-slate-600">
-          <p>© 2026 GetHotels. All rights reserved.</p>
-          <Link href="/" className="text-sky-600 hover:text-sky-700 transition mt-4 inline-block">
-            Back to Home
-          </Link>
-        </div>
+            {/* Consent & Audit Trail Footer Notice */}
+            <div className="border-t border-slate-100 dark:border-slate-800 pt-6 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
+              <p>
+                Platform user consent is cryptographically recorded with timestamp and IP address under Indian Information Technology Act, 2000 & DPDP Act 2023.
+              </p>
+              <div className="flex items-center gap-4">
+                <Link href="/privacy" className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-2">
+                  Privacy Policy
+                </Link>
+                <Link href="/host/kyc" className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-2">
+                  Host Verification
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
-  );
+  )
 }

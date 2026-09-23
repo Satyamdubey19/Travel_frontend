@@ -36,22 +36,25 @@ type TourListing = {
   inventoryDetails: { label: string; available: number; total: number }[]
   bookings: number
   reviews: number
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH"
+  riskDisclosure: string | null
+  meetingPoint: string | null
+  eligibilityRequirements: string[]
+  requiredEquipment: string[]
+  emergencyPlan: string | null
+  minimumAge: number
+  requiresCaretaker: boolean
   createdAt: string
 }
 
 const statusTabs = ["all", "PENDING_REVIEW", "ACTIVE", "REJECTED", "PAUSED", "ARCHIVED"]
 
 function riskFor(row: TourListing) {
-  let score = 0
-  if (row.status === "PENDING_REVIEW") score += 20
-  if (!row.isApproved) score += 20
-  if (row.bookings > 20 && row.reviews < 2) score += 15
-  if (row.price > 100000) score += 15
-  if ((row.inventoryDetails[0]?.total || 0) > 40) score += 10
-  if (row.status === "REJECTED" || row.status === "PAUSED") score += 20
-  if (score >= 55) return { label: "High risk", tone: "bg-red-50 text-red-700 ring-red-200", icon: ShieldAlert }
-  if (score >= 25) return { label: "Review needed", tone: "bg-amber-50 text-amber-700 ring-amber-200", icon: AlertTriangle }
-  return { label: "Low risk", tone: "bg-emerald-50 text-emerald-700 ring-emerald-200", icon: ShieldCheck }
+  if (!row.riskDisclosure || !row.meetingPoint || !row.eligibilityRequirements.length) return { label: "Safety data missing", tone: "bg-red-50 text-red-700 ring-red-200", icon: ShieldAlert }
+  if (row.riskLevel === "VERY_HIGH") return { label: "Very high · blocked", tone: "bg-red-50 text-red-700 ring-red-200", icon: ShieldAlert }
+  if (row.riskLevel === "HIGH") return { label: "High", tone: "bg-orange-50 text-orange-700 ring-orange-200", icon: AlertTriangle }
+  if (row.riskLevel === "MEDIUM") return { label: "Medium", tone: "bg-amber-50 text-amber-700 ring-amber-200", icon: AlertTriangle }
+  return { label: "Low", tone: "bg-emerald-50 text-emerald-700 ring-emerald-200", icon: ShieldCheck }
 }
 
 export default function AdminTourModerationPage() {
@@ -68,7 +71,7 @@ export default function AdminTourModerationPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams({ type: "tour", status, search, limit: "100" })
-      const { data: payload } = await api.get(`/admin/tours?${params.toString()}`, {
+      const { data: payload } = await api.get(`/admin/listings?${params.toString()}`, {
         headers: { "Cache-Control": "no-store" },
       })
       setRows(payload.data || [])
@@ -85,15 +88,19 @@ export default function AdminTourModerationPage() {
     total: rows.length,
     pending: rows.filter((row) => row.status === "PENDING_REVIEW").length,
     approved: rows.filter((row) => row.status === "ACTIVE").length,
-    flagged: rows.filter((row) => riskFor(row).label !== "Low risk").length,
+    flagged: rows.filter((row) => row.riskLevel === "HIGH" || row.riskLevel === "VERY_HIGH" || !row.riskDisclosure).length,
     bookings: rows.reduce((sum, row) => sum + row.bookings, 0),
     revenue: rows.reduce((sum, row) => sum + row.bookings * Number(row.price || 0), 0),
   }), [rows])
 
   const updateListing = async (row: TourListing, nextStatus: string, isActive: boolean) => {
+    if ((reason.trim() || internalNotes.trim()).length < 5) {
+      alert("Add a decision note of at least 5 characters for the audit trail.")
+      return
+    }
     setSaving(true)
     try {
-      await api.patch(`/admin/tours/${row.id}`, {
+      await api.patch(`/admin/listings/tour/${row.id}`, {
           status: nextStatus,
           isActive,
           reason: reason.trim() || internalNotes.trim() || undefined,
@@ -133,7 +140,7 @@ export default function AdminTourModerationPage() {
             { label: "Flagged", value: stats.flagged, icon: ShieldAlert },
             { label: "Bookings", value: stats.bookings, icon: Users },
             { label: "Revenue", value: `INR ${stats.revenue.toLocaleString("en-IN")}`, icon: TrendingUp },
-            { label: "Complaints", value: 0, icon: FileWarning },
+            { label: "Complaints", value: "Not tracked", icon: FileWarning },
           ].map((card) => {
             const Icon = card.icon
             return (
@@ -208,7 +215,7 @@ export default function AdminTourModerationPage() {
                         <td className="px-5 py-4"><StatusBadge status={row.status} /></td>
                         <td className="px-5 py-4 font-bold text-slate-900">{row.inventoryLabel}</td>
                         <td className="px-5 py-4 font-bold text-slate-900">INR {Number(row.price || 0).toLocaleString("en-IN")}</td>
-                        <td className="px-5 py-4 font-bold text-slate-900">0 complaints</td>
+                        <td className="px-5 py-4 text-slate-500">Not connected</td>
                         <td className="px-5 py-4">
                           <button onClick={() => setSelected(row)} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white transition hover:bg-cyan-700">
                             <Eye className="h-3.5 w-3.5" />
@@ -224,30 +231,9 @@ export default function AdminTourModerationPage() {
           )}
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Moderation analytics</p>
-            <h2 className="mt-2 text-xl font-black text-slate-950">Tour quality distribution</h2>
-            <div className="mt-5 grid h-56 grid-cols-6 items-end gap-3">
-              {[45, 70, 38, 82, 54, 64].map((height, index) => (
-                <div key={index} className="flex h-full flex-col justify-end gap-2">
-                  <div className="rounded-t-2xl bg-cyan-700" style={{ height: `${height}%` }} />
-                  <p className="text-center text-xs font-bold text-slate-500">W{index + 1}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Risk indicators</p>
-            <div className="mt-4 space-y-3">
-              {["High price with low reviews", "Large group size", "Safety toggle missing", "Repeated host complaints"].map((item) => (
-                <div key={item} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 text-sm font-semibold text-slate-700">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950">
+          <p className="font-black">Known data boundary</p>
+          <p className="mt-1">Complaint counts and historical quality trends are not shown because incident case management is not connected yet. Risk labels now come from the host&apos;s explicit classification and required safety fields; administrators must evaluate the evidence and cannot publish very-high-risk supply yet.</p>
         </div>
       </div>
 
@@ -283,15 +269,28 @@ export default function AdminTourModerationPage() {
                 </div>
               </div>
               <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-700">Risk review</p>
-                <div className="mt-3 space-y-2">
-                  {["Host identity and payout match", "Pricing looks realistic", "Safety policy reviewed", "No duplicate destination spam"].map((item) => (
-                    <label key={item} className="flex items-center gap-3 rounded-xl bg-white p-3 text-sm font-semibold text-slate-700">
-                      <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-cyan-700" />
-                      {item}
-                    </label>
-                  ))}
-                </div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-700">Declared risk</p>
+                <p className="mt-3 text-2xl font-black text-red-950">{selected.riskLevel.replaceAll("_", " ")}</p>
+                <dl className="mt-4 space-y-3 text-sm">
+                  <div><dt className="text-xs font-bold text-red-600">Minimum age</dt><dd className="font-black text-red-950">{selected.minimumAge} years</dd></div>
+                  <div><dt className="text-xs font-bold text-red-600">Caretaker required</dt><dd className="font-black text-red-950">{selected.requiresCaretaker ? "Yes" : "No"}</dd></div>
+                  <div><dt className="text-xs font-bold text-red-600">Join controls</dt><dd className="font-black text-red-950">Server policy validates high-risk restrictions on approval</dd></div>
+                </dl>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Risk disclosure</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{selected.riskDisclosure || "Missing — approval is blocked"}</p>
+                <h3 className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Meeting guidance</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{selected.meetingPoint || "Missing — approval is blocked"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Eligibility and equipment</h3>
+                <ul className="mt-2 space-y-1 text-sm text-slate-700">{selected.eligibilityRequirements.map((item) => <li key={item}>• {item}</li>)}</ul>
+                <ul className="mt-3 space-y-1 text-sm text-slate-700">{selected.requiredEquipment.map((item) => <li key={item}>• {item}</li>)}</ul>
+                {selected.emergencyPlan && <><h3 className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Emergency plan</h3><p className="mt-2 text-sm leading-6 text-slate-700">{selected.emergencyPlan}</p></>}
               </div>
             </div>
 

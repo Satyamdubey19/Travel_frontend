@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { Tour } from '@/lib/tours'
+import DatePicker from '@/components/ui/DatePicker'
 
 type TourPlanningProps = {
   tour: Tour
@@ -34,22 +35,22 @@ export const TourPlanning = ({ tour }: TourPlanningProps) => {
 
       <div className="grid md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Start Date</label>
-          <input
-            type="date"
+          <DatePicker
+            label="Preferred Start Date"
             value={planData.startDate}
-            onChange={(e) => handleChange('startDate', e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(val) => handleChange('startDate', val)}
+            minDate={new Date().toISOString().slice(0, 10)}
+            placeholder="Select start date"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Preferred End Date</label>
-          <input
-            type="date"
+          <DatePicker
+            label="Preferred End Date"
             value={planData.endDate}
-            onChange={(e) => handleChange('endDate', e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(val) => handleChange('endDate', val)}
+            minDate={planData.startDate || new Date().toISOString().slice(0, 10)}
+            placeholder="Select end date"
           />
         </div>
       </div>

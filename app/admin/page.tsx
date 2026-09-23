@@ -24,6 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import StatCard from '@/components/ui/StatCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { AdminDashboardSkeleton } from '@/components/ui/loading-skeletons';
+import api, { getApiErrorMessage } from '@/lib/axios';
 
 interface DashboardStats {
   totalUsers: number;
@@ -41,7 +42,7 @@ interface DashboardStats {
 
 interface RecentActivity {
   id: string;
-  type: 'booking' | 'kyc' | 'payout' | 'user';
+  type: 'booking' | 'kyc' | 'payout' | 'user' | 'listing' | 'host';
   description: string;
   timestamp: string;
   status: 'pending' | 'completed' | 'rejected';
@@ -49,8 +50,6 @@ interface RecentActivity {
 }
 
 type WorkspaceView = 'operations' | 'compliance' | 'growth';
-
-const revenueTrend = [8.4, 9.1, 10.2, 10.9, 11.6, 12.4, 12.9];
 
 const workspaceViews: Array<{
   id: WorkspaceView;
@@ -68,6 +67,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('operations');
 
   useEffect(() => {
@@ -82,69 +82,43 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      setStats({
-        totalUsers: 1250,
-        totalHosts: 145,
-        totalBookings: 2847,
-        pendingKYC: 23,
-        approvedKYC: 142,
-        rejectedKYC: 5,
-        totalRevenue: 1254780,
-        totalPayouts: 980420,
-        pendingPayouts: 47500,
-        confirmedBookings: 2156,
-        cancelledBookings: 311,
-      });
-
-      setRecentActivity([
-        {
-          id: '1',
-          type: 'kyc',
-          description: 'New business identity package submitted by John Travel Group',
-          timestamp: new Date().toISOString(),
-          status: 'pending',
-          href: '/admin/kyc',
-        },
-        {
-          id: '2',
-          type: 'booking',
-          description: 'Booking #1234 dispute resolved and released to host wallet',
-          timestamp: new Date(Date.now() - 1000 * 60 * 52).toISOString(),
-          status: 'completed',
-          href: '/admin/bookings',
-        },
-        {
-          id: '3',
-          type: 'payout',
-          description: 'Mumbai Travel Ltd payout batch requires secondary review',
-          timestamp: new Date(Date.now() - 1000 * 60 * 115).toISOString(),
-          status: 'pending',
-          href: '/admin/payouts',
-        },
-        {
-          id: '4',
-          type: 'user',
-          description: 'Account moderation flag opened for duplicate traveler profile',
-          timestamp: new Date(Date.now() - 1000 * 60 * 220).toISOString(),
-          status: 'rejected',
-          href: '/admin/users',
-        },
-      ]);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
+      setError('');
+      const { data } = await api.get<{ data: { stats: DashboardStats; recentActivity: RecentActivity[] } }>('/admin/dashboard');
+      setStats(data.data.stats);
+      setRecentActivity(data.data.recentActivity ?? []);
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Unable to load platform metrics'));
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading || !stats) {
+  if (loading) {
     return <AdminDashboardSkeleton />;
+  }
+
+  if (!stats) {
+    return (
+      <div className="min-h-screen px-4 py-10 sm:px-6 lg:px-8">
+        <div role="alert" className="mx-auto max-w-3xl rounded-[28px] border border-rose-200 bg-rose-50 p-6 text-rose-800 shadow-lg">
+          <h1 className="text-xl font-semibold">Platform metrics are unavailable</h1>
+          <p className="mt-2 text-sm">{error || 'The dashboard could not load current records.'}</p>
+          <button type="button" onClick={() => void fetchStats()} className="mt-5 rounded-xl bg-rose-700 px-4 py-2 text-sm font-bold text-white hover:bg-rose-800">Try again</button>
+        </div>
+      </div>
+    );
   }
 
   const approvalRate = Math.round((stats.approvedKYC / Math.max(stats.approvedKYC + stats.pendingKYC + stats.rejectedKYC, 1)) * 100);
   const payoutCoverage = Math.round((stats.totalPayouts / Math.max(stats.totalRevenue, 1)) * 100);
   const cancellationRate = Math.round((stats.cancelledBookings / Math.max(stats.totalBookings, 1)) * 100);
   const greetingName = user?.name || 'Admin';
+  const moneyBreakdown = [
+    { label: 'Gross', value: stats.totalRevenue },
+    { label: 'Settled', value: stats.totalPayouts },
+    { label: 'Pending', value: stats.pendingPayouts },
+  ];
+  const largestMoneyValue = Math.max(...moneyBreakdown.map((item) => item.value), 1);
 
   const priorityCards = [
     {
@@ -205,42 +179,42 @@ export default function AdminDashboard() {
   const workspacePanels: Record<WorkspaceView, Array<{ title: string; detail: string; href: string; icon: typeof Activity }>> = {
     operations: [
       {
-        title: 'Bookings that need manual follow-up',
-        detail: '8 reservations have schedule edits or payment mismatches.',
+        title: 'Review booking exceptions',
+        detail: `${stats.cancelledBookings} cancelled bookings are currently recorded.`,
         href: '/admin/bookings',
         icon: BookOpenCheck,
       },
       {
-        title: 'Traveler support escalations',
-        detail: '3 cases have been open for more than 12 hours.',
+        title: 'Review traveler accounts',
+        detail: `${stats.totalUsers} platform accounts are available for status review.`,
         href: '/admin/users',
         icon: UserCog,
       },
     ],
     compliance: [
       {
-        title: 'Business identities waiting for legal review',
-        detail: '12 host records include newly uploaded tax paperwork.',
+        title: 'Business identities awaiting review',
+        detail: `${stats.pendingKYC} KYC applications are currently pending.`,
         href: '/admin/kyc',
         icon: ShieldCheck,
       },
       {
-        title: 'Rejected accounts with appeal requests',
-        detail: '4 hosts have submitted revised documents after rejection.',
+        title: 'Rejected KYC records',
+        detail: `${stats.rejectedKYC} KYC applications are currently rejected.`,
         href: '/admin/hosts',
         icon: CircleAlert,
       },
     ],
     growth: [
       {
-        title: 'High-performing hosts to feature',
-        detail: 'Top 10 partners crossed the 95% response-health threshold.',
+        title: 'Host portfolio',
+        detail: `${stats.totalHosts} active host records are currently tracked.`,
         href: '/admin/hosts',
         icon: TrendingUp,
       },
       {
-        title: 'Revenue segments gaining momentum',
-        detail: 'Weekend tours and premium stays are driving this month’s lift.',
+        title: 'Revenue and settlement view',
+        detail: `${formatCurrency(stats.totalRevenue)} gross revenue is currently recorded.`,
         href: '/admin/analytics',
         icon: BarChart3,
       },
@@ -250,6 +224,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        {error && <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div>}
         <section className="relative overflow-hidden rounded-[36px] border border-white/60 bg-slate-950 px-6 py-8 text-white shadow-[0_30px_90px_rgba(15,23,42,0.24)] sm:px-8 lg:px-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(34,211,238,0.22),transparent_26%),radial-gradient(circle_at_80%_15%,rgba(59,130,246,0.24),transparent_22%),radial-gradient(circle_at_72%_78%,rgba(14,165,233,0.16),transparent_24%)]" />
           <div className="absolute -right-12 top-10 h-40 w-40 rounded-full border border-white/10 bg-white/5 blur-2xl" />
@@ -261,14 +236,14 @@ export default function AdminDashboard() {
               </div>
               <div className="max-w-3xl space-y-3">
                 <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
-                  {greetingName}, the platform is healthy, but there are a few queues that need your attention.
+                  {greetingName}, here is the current operational picture.
                 </h2>
                 <p className="max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
                   Move through compliance reviews, payout approvals, and booking exceptions from one workspace designed for fast operational decisions.
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
-                <HeroMetric label="Gross revenue" value={formatCurrency(stats.totalRevenue)} detail="7.8% ahead of the last cycle" />
+                <HeroMetric label="Gross revenue" value={formatCurrency(stats.totalRevenue)} detail="Successful payments currently recorded" />
                 <HeroMetric label="Active hosts" value={stats.totalHosts.toLocaleString()} detail={`${stats.pendingKYC} still waiting for approval`} />
                 <HeroMetric label="Confirmed bookings" value={stats.confirmedBookings.toLocaleString()} detail={`${cancellationRate}% cancellation rate`} />
               </div>
@@ -286,7 +261,7 @@ export default function AdminDashboard() {
                   <p className="mt-2 text-lg font-semibold text-white">Operational health</p>
                 </div>
                 <div className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-                  Stable
+                  Live data
                 </div>
               </div>
               <div className="space-y-3">
@@ -314,7 +289,7 @@ export default function AdminDashboard() {
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard title="Platform users" value={stats.totalUsers} icon={<Users className="h-7 w-7" />} color="blue" href="/admin/users" change="Includes travelers, hosts, and admin accounts" />
-          <StatCard title="Host partners" value={stats.totalHosts} icon={<Building2 className="h-7 w-7" />} color="purple" href="/admin/hosts" change="14 high-value accounts added this quarter" />
+          <StatCard title="Host partners" value={stats.totalHosts} icon={<Building2 className="h-7 w-7" />} color="purple" href="/admin/hosts" change="Active host records" />
           <StatCard title="Pending KYC" value={stats.pendingKYC} icon={<ShieldCheck className="h-7 w-7" />} color="yellow" href="/admin/kyc" highlight={stats.pendingKYC > 0} change="Compliance queue needs same-day review" />
           <StatCard title="Bookings tracked" value={stats.totalBookings} icon={<CalendarClock className="h-7 w-7" />} color="green" href="/admin/bookings" change={`${stats.confirmedBookings.toLocaleString()} already confirmed`} />
         </section>
@@ -364,18 +339,18 @@ export default function AdminDashboard() {
             <div className="mt-2 flex items-end justify-between gap-3">
               <div>
                 <h3 className="text-2xl font-semibold tracking-tight text-slate-950">{formatCurrency(stats.totalRevenue)}</h3>
-                <p className="mt-1 text-sm text-slate-600">Gross platform revenue with steady month-on-month lift.</p>
+                <p className="mt-1 text-sm text-slate-600">Current payment and payout totals from platform records.</p>
               </div>
-              <div className="rounded-2xl bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700">+7.8%</div>
+              <div className="rounded-2xl bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700">Recorded</div>
             </div>
             <div className="mt-6 flex h-44 items-end gap-3">
-              {revenueTrend.map((value, index) => (
-                <div key={`${value}-${index}`} className="flex flex-1 flex-col items-center gap-3">
+              {moneyBreakdown.map((item) => (
+                <div key={item.label} className="flex flex-1 flex-col items-center gap-3">
                   <div
                     className="w-full rounded-t-[18px] bg-[linear-gradient(180deg,#0ea5e9_0%,#2563eb_100%)] shadow-[0_14px_30px_rgba(37,99,235,0.18)]"
-                    style={{ height: `${Math.max(value * 9, 28)}px` }}
+                    style={{ height: `${Math.max((item.value / largestMoneyValue) * 140, 18)}px` }}
                   />
-                  <span className="text-xs font-medium text-slate-500">W{index + 1}</span>
+                  <span className="text-xs font-medium text-slate-500">{item.label}</span>
                 </div>
               ))}
             </div>

@@ -14,23 +14,14 @@ export default function PostsPage() {
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    setIsMounted(true)
-    const savedLikes = localStorage.getItem('postLikes')
-    const savedLiked = localStorage.getItem('userLikes')
-    
-    if (savedLikes) {
-      setLikes(JSON.parse(savedLikes))
-    } else {
-      const initialLikes: Record<string, number> = {}
-      userPosts.forEach(post => {
-        initialLikes[post.id] = post.likes
-      })
-      setLikes(initialLikes)
-    }
-    
-    if (savedLiked) {
-      setLiked(new Set(JSON.parse(savedLiked)))
-    }
+    queueMicrotask(() => {
+      setIsMounted(true)
+      const savedLikes = localStorage.getItem('postLikes')
+      const savedLiked = localStorage.getItem('userLikes')
+      if (savedLikes) setLikes(JSON.parse(savedLikes))
+      else setLikes(Object.fromEntries(userPosts.map(post => [post.id, post.likes])))
+      if (savedLiked) setLiked(new Set(JSON.parse(savedLiked)))
+    })
   }, [])
 
   // Save likes to localStorage

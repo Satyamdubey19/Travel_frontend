@@ -12,6 +12,8 @@ import {
   MapPin,
   Sparkles,
   Ticket,
+  Star,
+  XCircle,
 } from "lucide-react"
 import Header from "@/components/layout/Header/Header"
 import Footer from "@/components/layout/Footer/Footer"
@@ -19,7 +21,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/Button"
 import { Card, CardContent } from "@/components/ui/Card"
 import type { BookingCategory, UnifiedBookingRecord } from "@/types/my-bookings"
-import api from "@/lib/axios"
+import api, { getApiErrorMessage } from "@/lib/axios"
 
 type FilterType = "ALL" | BookingCategory
 
@@ -34,6 +36,7 @@ const statusTone: Record<string, string> = {
   CONFIRMED: "bg-sky-50 text-sky-700 ring-sky-200",
   COMPLETED: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   CANCELLED: "bg-rose-50 text-rose-700 ring-rose-200",
+  REFUND_PENDING: "bg-orange-50 text-orange-700 ring-orange-200",
   CHECKED_IN: "bg-indigo-50 text-indigo-700 ring-indigo-200",
   CHECKED_OUT: "bg-slate-100 text-slate-700 ring-slate-200",
 }
@@ -83,24 +86,33 @@ function BookingFilterButton({
 export default function MyBookingsPage() {
   const { isAuthenticated, loading } = useAuth()
   const [bookings, setBookings] = useState<UnifiedBookingRecord[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterType>("ALL")
+  const [actionId, setActionId] = useState<string | null>(null)
+  const [cancelReason, setCancelReason] = useState("")
+  const [reviewRating, setReviewRating] = useState(5)
+  const [reviewComment, setReviewComment] = useState("")
+  const [actionBusy, setActionBusy] = useState(false)
+  const [actionMessage, setActionMessage] = useState("")
 
   useEffect(() => {
-    if (loading || !isAuthenticated) {
-      setIsLoading(false)
-      return
+    if (loading || !isAuthenticated) return
+    let active = true
+    const loadBookings = async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const { data: payload } = await api.get("/my-bookings")
+        if (active) setBookings(Array.isArray(payload.data) ? payload.data as UnifiedBookingRecord[] : [])
+      } catch {
+        if (active) setError("Could not load your bookings right now.")
+      } finally {
+        if (active) setIsLoading(false)
+      }
     }
-
-    setIsLoading(true)
-    setError(null)
-
-    api.get("/my-bookings")
-      .then(({ data: payload }) => Array.isArray(payload.data) ? payload.data as UnifiedBookingRecord[] : [])
-      .then((data) => setBookings(data))
-      .catch(() => setError("Could not load your bookings right now."))
-      .finally(() => setIsLoading(false))
+    void loadBookings()
+    return () => { active = false }
   }, [isAuthenticated, loading])
 
   const filteredBookings = useMemo(() => {
@@ -114,6 +126,64 @@ export default function MyBookingsPage() {
     RENTAL: bookings.filter((b) => b.bookingType === "RENTAL").length,
     ACTIVITY: bookings.filter((b) => b.bookingType === "ACTIVITY").length,
   }), [bookings])
+
+  const cancelActivity = async (booking: UnifiedBookingRecord) => {
+    if (cancelReason.trim().length < 5) return setActionMessage("Enter a cancellation reason of at least 5 characters.")
+    try {
+      setActionBusy(true)
+      setActionMessage("")
+      const { data } = await api.post<{ data: { status: string; refundStatus?: string | null } }>(`/activity-bookings/${booking.id}/cancel`, { reason: cancelReason.trim() })
+      setBookings((items) => items.map((item) => item.id === booking.id && item.bookingType === "ACTIVITY" ? { ...item, status: data.data.status } : item))
+      setActionMessage(data.data.refundStatus ? "Cancellation saved. Refund review is pending against the captured policy." : "Booking cancelled and held spots released.")
+      setCancelReason("")
+    } catch (requestError) {
+      setActionMessage(getApiErrorMessage(requestError, "Cancellation failed"))
+    } finally { setActionBusy(false) }
+  }
+
+  const submitActivityReview = async (booking: UnifiedBookingRecord) => {
+    if (reviewComment.trim().length < 10) return setActionMessage("Write at least 10 characters for your review.")
+    const activityKey = booking.href.split("/").filter(Boolean).pop()
+    if (!activityKey) return setActionMessage("Activity reference is unavailable.")
+    try {
+      setActionBusy(true)
+      setActionMessage("")
+      await api.post(`/activity/${encodeURIComponent(activityKey)}/reviews`, { rating: reviewRating, comment: reviewComment.trim() })
+      setActionMessage("Your verified review was published.")
+      setReviewComment("")
+    } catch (requestError) {
+      setActionMessage(getApiErrorMessage(requestError, "Review could not be saved"))
+    } finally { setActionBusy(false) }
+  }
+
+  const cancelRental = async (booking: UnifiedBookingRecord) => {
+    if (cancelReason.trim().length < 5) return setActionMessage("Enter a cancellation reason of at least 5 characters.")
+    try {
+      setActionBusy(true)
+      setActionMessage("")
+      const { data } = await api.post<{ data: { status: string; refundStatus?: string | null } }>(`/rental-bookings/${booking.id}/cancel`, { reason: cancelReason.trim() })
+      setBookings((items) => items.map((item) => item.id === booking.id && item.bookingType === "RENTAL" ? { ...item, status: data.data.status } : item))
+      setActionMessage(data.data.refundStatus ? "Cancellation saved. Refund review is pending against the captured policy." : "Rental cancelled and the date hold released.")
+      setCancelReason("")
+    } catch (requestError) {
+      setActionMessage(getApiErrorMessage(requestError, "Cancellation failed"))
+    } finally { setActionBusy(false) }
+  }
+
+  const submitRentalReview = async (booking: UnifiedBookingRecord) => {
+    if (reviewComment.trim().length < 10) return setActionMessage("Write at least 10 characters for your review.")
+    const rentalKey = booking.href.split("/").filter(Boolean).pop()
+    if (!rentalKey) return setActionMessage("Rental reference is unavailable.")
+    try {
+      setActionBusy(true)
+      setActionMessage("")
+      await api.post(`/rental/${encodeURIComponent(rentalKey)}/reviews`, { rating: reviewRating, comment: reviewComment.trim() })
+      setActionMessage("Your verified rental review was published.")
+      setReviewComment("")
+    } catch (requestError) {
+      setActionMessage(getApiErrorMessage(requestError, "Review could not be saved"))
+    } finally { setActionBusy(false) }
+  }
 
   return (
     <>
@@ -175,6 +245,9 @@ export default function MyBookingsPage() {
                     <Button asChild variant="outline" className="rounded-xl border-slate-200 bg-white">
                       <Link href="/activities">Explore Activities</Link>
                     </Button>
+                    <Button asChild variant="outline" className="rounded-xl border-slate-200 bg-white">
+                      <Link href="/car-rental">Explore Rentals</Link>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -231,10 +304,66 @@ export default function MyBookingsPage() {
                         </p>
                         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">{booking.currency}</p>
                         <Button asChild className="mt-1 h-9 rounded-xl bg-slate-950 px-4 text-white hover:bg-blue-700">
-                          <Link href={booking.href}>View details</Link>
+                          <Link href={`/my-bookings/${booking.bookingType.toLowerCase()}/${booking.id}`}>Manage booking</Link>
                         </Button>
+                        {booking.bookingType === "ACTIVITY" && ["PENDING", "CONFIRMED"].includes(booking.status) && (
+                          <Button type="button" variant="outline" onClick={() => { setActionId(actionId === booking.id ? null : booking.id); setActionMessage("") }} className="h-9 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"><XCircle className="h-4 w-4" /> Cancel</Button>
+                        )}
+                        {booking.bookingType === "ACTIVITY" && booking.status === "COMPLETED" && (
+                          <Button type="button" variant="outline" onClick={() => { setActionId(actionId === booking.id ? null : booking.id); setActionMessage("") }} className="h-9 rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50"><Star className="h-4 w-4" /> Review</Button>
+                        )}
+                        {booking.bookingType === "RENTAL" && ["PENDING", "CONFIRMED"].includes(booking.status) && (
+                          <Button type="button" variant="outline" onClick={() => { setActionId(actionId === booking.id ? null : booking.id); setActionMessage("") }} className="h-9 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"><XCircle className="h-4 w-4" /> Cancel</Button>
+                        )}
+                        {booking.bookingType === "RENTAL" && booking.status === "COMPLETED" && (
+                          <Button type="button" variant="outline" onClick={() => { setActionId(actionId === booking.id ? null : booking.id); setActionMessage("") }} className="h-9 rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50"><Star className="h-4 w-4" /> Review</Button>
+                        )}
                       </div>
                     </div>
+                    {booking.refundStatus && (
+                      <div className="mt-4 rounded-2xl border border-orange-100 bg-orange-50 p-4 text-sm text-orange-950">
+                        <p className="font-black">Refund: {booking.refundStatus.replaceAll("_", " ")}{booking.refundAmount ? ` · up to ₹${booking.refundAmount.toLocaleString("en-IN")}` : ""}</p>
+                        {booking.refundMessage && <p className="mt-1 text-orange-800">{booking.refundMessage}</p>}
+                      </div>
+                    )}
+                    {actionId === booking.id && booking.bookingType === "ACTIVITY" && (
+                      <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        {["PENDING", "CONFIRMED"].includes(booking.status) ? (
+                          <div className="space-y-3">
+                            <label className="block text-sm font-bold text-slate-800">Why are you cancelling?</label>
+                            <textarea value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} rows={3} maxLength={500} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100" placeholder="Tell support and the host what changed" />
+                            <Button type="button" disabled={actionBusy || cancelReason.trim().length < 5} onClick={() => void cancelActivity(booking)} className="rounded-xl bg-rose-700 text-white hover:bg-rose-800">{actionBusy ? "Cancelling…" : "Confirm cancellation"}</Button>
+                          </div>
+                        ) : booking.status === "COMPLETED" ? (
+                          <div className="space-y-3">
+                            <label className="block text-sm font-bold text-slate-800">Verified activity review</label>
+                            <div className="flex gap-2" aria-label="Rating">{[1, 2, 3, 4, 5].map((rating) => <button type="button" key={rating} onClick={() => setReviewRating(rating)} className="p-1" aria-label={`${rating} stars`}><Star className={`h-6 w-6 ${rating <= reviewRating ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} /></button>)}</div>
+                            <textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={4} maxLength={2000} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" placeholder="Share specific, respectful feedback for future travelers" />
+                            <Button type="button" disabled={actionBusy || reviewComment.trim().length < 10} onClick={() => void submitActivityReview(booking)} className="rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400">{actionBusy ? "Publishing…" : "Publish verified review"}</Button>
+                          </div>
+                        ) : null}
+                        {actionMessage && <p role="status" className="mt-3 text-sm font-semibold text-slate-700">{actionMessage}</p>}
+                      </div>
+                    )}
+                    {actionId === booking.id && booking.bookingType === "RENTAL" && (
+                      <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        {["PENDING", "CONFIRMED"].includes(booking.status) ? (
+                          <div className="space-y-3">
+                            <label className="block text-sm font-bold text-slate-800">Why are you cancelling?</label>
+                            <textarea value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} rows={3} maxLength={500} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100" placeholder="Tell support and the host what changed" />
+                            <Button type="button" disabled={actionBusy || cancelReason.trim().length < 5} onClick={() => void cancelRental(booking)} className="rounded-xl bg-rose-700 text-white hover:bg-rose-800">{actionBusy ? "Cancelling…" : "Confirm cancellation"}</Button>
+                          </div>
+                        ) : booking.status === "COMPLETED" ? (
+                          <div className="space-y-3">
+                            <label className="block text-sm font-bold text-slate-800">Verified rental review</label>
+                            <div className="flex gap-2" aria-label="Rating">{[1, 2, 3, 4, 5].map((rating) => <button type="button" key={rating} onClick={() => setReviewRating(rating)} className="p-1" aria-label={`${rating} stars`}><Star className={`h-6 w-6 ${rating <= reviewRating ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} /></button>)}</div>
+                            <textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} rows={4} maxLength={2000} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" placeholder="Share specific, respectful feedback about the vehicle and host" />
+                            <Button type="button" disabled={actionBusy || reviewComment.trim().length < 10} onClick={() => void submitRentalReview(booking)} className="rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400">{actionBusy ? "Publishing…" : "Publish verified review"}</Button>
+                          </div>
+                        ) : null}
+                        {actionMessage && <p role="status" className="mt-3 text-sm font-semibold text-slate-700">{actionMessage}</p>}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )

@@ -5,7 +5,6 @@ import Link from "next/link"
 import {
   Archive,
   CalendarDays,
-  Copy,
   Edit3,
   Eye,
   MessageCircle,
@@ -52,6 +51,7 @@ export default function HostToursDashboard() {
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("all")
   const [sort, setSort] = useState("newest")
+  const [archivingId, setArchivingId] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -92,6 +92,14 @@ export default function HostToursDashboard() {
     const pending = tours.filter((tour) => tour.status === "PENDING_REVIEW").length
     return { active, upcoming, bookings, revenue, avgRating, pending }
   }, [tours])
+
+  const archiveTour = async (id: string) => {
+    setArchivingId(id)
+    try {
+      await api.delete(`/tour/${id}`)
+      setTours((items) => items.map((item) => item.id === id ? { ...item, status: "ARCHIVED", isActive: false, isApproved: false } : item))
+    } finally { setArchivingId(null) }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/70 px-4 py-6 sm:px-6 lg:px-8">
@@ -203,8 +211,7 @@ export default function HostToursDashboard() {
                         <Link href={`/host/tours/${tour.id}`} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white hover:bg-cyan-700"><Edit3 className="h-3.5 w-3.5" />Edit</Link>
                         <Link href={`/host/tours/${tour.id}/participants`} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"><Users className="h-3.5 w-3.5" />Participants</Link>
                         <Link href={`/host/tours/${tour.id}/chat`} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"><MessageCircle className="h-3.5 w-3.5" />Chat</Link>
-                        <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"><Copy className="h-3.5 w-3.5" />Duplicate</button>
-                        <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"><Archive className="h-3.5 w-3.5" />Archive</button>
+                        {tour.status !== "ARCHIVED" && <button disabled={archivingId === tour.id} onClick={() => void archiveTour(tour.id)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-50"><Archive className="h-3.5 w-3.5" />{archivingId === tour.id ? "Archiving…" : "Archive"}</button>}
                       </div>
                     </div>
                   </div>

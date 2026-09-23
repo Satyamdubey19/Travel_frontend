@@ -65,7 +65,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
   }
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    queueMicrotask(() => {
       const stored = localStorage.getItem('wishlist')
       if (stored) {
         try {
@@ -74,8 +74,8 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
           console.error('Failed to parse wishlist from localStorage:', e)
         }
       }
-    }
-    setIsMounted(true)
+      setIsMounted(true)
+    })
   }, [])
 
   useEffect(() => {

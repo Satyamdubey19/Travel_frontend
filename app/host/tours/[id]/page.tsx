@@ -17,7 +17,6 @@ import {
   Clock,
   Copy,
   Eye,
-  Globe2,
   GripVertical,
   ImageIcon,
   IndianRupee,
@@ -34,6 +33,7 @@ import {
   X,
 } from "lucide-react"
 import PhotoUploader from "@/components/ui/PhotoUploader"
+import DatePicker from "@/components/ui/DatePicker"
 import type { ItineraryDay, TourForm } from "@/types/host-forms"
 import api, { getApiErrorMessage } from "@/lib/axios"
 
@@ -74,6 +74,13 @@ const errorSectionByField: Record<string, string> = {
   originalPrice: "pricing",
   images: "media",
   itinerary: "itinerary",
+  riskLevel: "safety",
+  riskDisclosure: "safety",
+  meetingPoint: "safety",
+  eligibilityRequirements: "safety",
+  requiredEquipment: "safety",
+  emergencyPlan: "safety",
+  minimumAge: "safety",
 }
 
 function makeItinerary(days: number): ItineraryDay[] {
@@ -263,6 +270,14 @@ export default function HostTourForm() {
     womenOnly: false,
     safeForSoloWomen: false,
     verifiedTravelersOnly: false,
+    riskLevel: "LOW",
+    riskDisclosure: "",
+    meetingPoint: "",
+    eligibilityRequirements: [""],
+    requiredEquipment: [""],
+    emergencyPlan: "",
+    minimumAge: "18",
+    requiresCaretaker: false,
     pricePerPerson: "",
     originalPrice: "",
     difficulty: "MODERATE",
@@ -333,6 +348,10 @@ export default function HostTourForm() {
         womenOnly: Boolean(data.womenOnly),
         safeForSoloWomen: Boolean(data.safeForSoloWomen),
         verifiedTravelersOnly: Boolean(data.verifiedTravelersOnly),
+        requiresCaretaker: Boolean(data.requiresCaretaker),
+        minimumAge: String(data.minimumAge ?? 18),
+        eligibilityRequirements: data.eligibilityRequirements?.length ? data.eligibilityRequirements : [""],
+        requiredEquipment: data.requiredEquipment?.length ? data.requiredEquipment : [""],
       }))
       setExpandedDays([1])
     } catch {
@@ -347,14 +366,14 @@ export default function HostTourForm() {
     setForm((prev: TourForm) => ({ ...prev, [field]: value }))
   }
 
-  const updateArray = (field: "highlights" | "included" | "excluded" | "images" | "tags", index: number, value: string) => {
+  const updateArray = (field: "highlights" | "included" | "excluded" | "images" | "tags" | "eligibilityRequirements" | "requiredEquipment", index: number, value: string) => {
     const next = [...((form[field] as string[]) || [])]
     next[index] = value
     set(field, next)
   }
 
-  const addArray = (field: "highlights" | "included" | "excluded" | "images" | "tags") => set(field, [...((form[field] as string[]) || []), ""])
-  const removeArray = (field: "highlights" | "included" | "excluded" | "images" | "tags", index: number) => set(field, ((form[field] as string[]) || []).filter((_, itemIndex) => itemIndex !== index))
+  const addArray = (field: "highlights" | "included" | "excluded" | "images" | "tags" | "eligibilityRequirements" | "requiredEquipment") => set(field, [...((form[field] as string[]) || []), ""])
+  const removeArray = (field: "highlights" | "included" | "excluded" | "images" | "tags" | "eligibilityRequirements" | "requiredEquipment", index: number) => set(field, ((form[field] as string[]) || []).filter((_, itemIndex) => itemIndex !== index))
 
   const setDuration = (value: string) => {
     const days = Math.max(1, Math.min(45, parseInt(value) || 1))
@@ -426,6 +445,18 @@ export default function HostTourForm() {
     if (originalPrice > 0 && originalPrice < price) next.originalPrice = "Original price must be greater than offer price."
     if (!form.images?.filter((url: string) => url.trim()).length) next.images = "Add at least one cover image."
     if (!form.itinerary?.length) next.itinerary = "Add at least one itinerary day."
+    if (!form.riskDisclosure?.trim() || form.riskDisclosure.trim().length < 40) next.riskDisclosure = "Explain real risks in at least 40 characters."
+    if (!form.meetingPoint?.trim() || form.meetingPoint.trim().length < 5) next.meetingPoint = "Add clear meeting-point guidance."
+    if (!form.eligibilityRequirements?.filter((item) => item.trim()).length) next.eligibilityRequirements = "Add at least one eligibility requirement."
+    const minimumAge = Number(form.minimumAge)
+    if (!Number.isInteger(minimumAge) || minimumAge < 5 || minimumAge > 100) next.minimumAge = "Minimum age must be between 5 and 100."
+    const elevatedRisk = ["MEDIUM", "HIGH", "VERY_HIGH"].includes(form.riskLevel)
+    const highRisk = ["HIGH", "VERY_HIGH"].includes(form.riskLevel)
+    if (elevatedRisk && (!form.emergencyPlan?.trim() || form.emergencyPlan.trim().length < 80)) next.emergencyPlan = "Medium and higher risk tours require an emergency plan of at least 80 characters."
+    if (highRisk && !form.requiredEquipment?.filter((item) => item.trim()).length) next.requiredEquipment = "High-risk tours require an equipment checklist."
+    if (highRisk && (!form.verifiedTravelersOnly || !form.joinApprovalRequired)) next.riskLevel = "High-risk tours require verified travelers and host approval."
+    if (highRisk && minimumAge < 18) next.minimumAge = "High-risk tours require a minimum age of 18."
+    if (form.riskLevel === "VERY_HIGH" && !form.requiresCaretaker) next.riskLevel = "Very-high-risk tours must require a caretaker and cannot publish until assignment controls exist."
 
     setErrors(next)
     return next
@@ -481,7 +512,7 @@ export default function HostTourForm() {
       location: Boolean(form.destination && form.city && form.country),
       schedule: Boolean(form.startDate && form.endDate && (!form.registrationDeadline || new Date(form.registrationDeadline) < new Date(form.startDate))),
       group: Number(form.totalSlots) > 0 && Number(form.availableSlots) <= Number(form.totalSlots),
-      safety: true,
+      safety: Boolean(form.riskLevel && form.riskDisclosure?.trim().length >= 40 && form.meetingPoint && form.eligibilityRequirements?.filter(Boolean).length && (!["MEDIUM", "HIGH", "VERY_HIGH"].includes(form.riskLevel) || form.emergencyPlan?.trim().length >= 80)),
       pricing: Number(form.pricePerPerson) > 0 && (!form.originalPrice || Number(form.originalPrice) >= Number(form.pricePerPerson)),
       content: form.highlights?.filter(Boolean).length > 0 && form.included?.filter(Boolean).length > 0,
       itinerary: form.itinerary?.length > 0 && form.itinerary.every((day: ItineraryDay) => day.title || day.description),
@@ -676,18 +707,33 @@ export default function HostTourForm() {
           <SectionCard id="schedule" eyebrow="Timing" title="Schedule & Registration" icon={<CalendarDays className="h-5 w-5" />} complete={completion.schedule}>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <label className={labelCls}>Start date *</label>
-                <input type="date" className={inputCls} value={form.startDate} onChange={(event) => setScheduleDate("startDate", event.target.value)} />
+                <DatePicker
+                  label="Start date *"
+                  value={form.startDate}
+                  onChange={(val) => setScheduleDate("startDate", val)}
+                  minDate={new Date().toISOString().slice(0, 10)}
+                  placeholder="Select start date"
+                />
                 <FieldError error={errors.startDate} />
               </div>
               <div>
-                <label className={labelCls}>End date *</label>
-                <input type="date" className={inputCls} value={form.endDate} onChange={(event) => setScheduleDate("endDate", event.target.value)} />
+                <DatePicker
+                  label="End date *"
+                  value={form.endDate}
+                  onChange={(val) => setScheduleDate("endDate", val)}
+                  minDate={form.startDate || new Date().toISOString().slice(0, 10)}
+                  placeholder="Select end date"
+                />
                 <FieldError error={errors.endDate} />
               </div>
               <div>
-                <label className={labelCls}>Registration deadline</label>
-                <input type="date" className={inputCls} value={form.registrationDeadline} onChange={(event) => setScheduleDate("registrationDeadline", event.target.value)} />
+                <DatePicker
+                  label="Registration deadline"
+                  value={form.registrationDeadline}
+                  onChange={(val) => setScheduleDate("registrationDeadline", val)}
+                  maxDate={form.startDate || undefined}
+                  placeholder="Select deadline"
+                />
                 <FieldError error={errors.registrationDeadline} />
               </div>
               <div>
@@ -718,11 +764,77 @@ export default function HostTourForm() {
           </SectionCard>
 
           <SectionCard id="safety" eyebrow="Access" title="Traveler Safety & Access" icon={<ShieldCheck className="h-5 w-5" />} complete={completion.safety}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ToggleCard checked={Boolean(form.womenOnly)} onChange={(value) => set("womenOnly", value)} icon={<ShieldCheck className="h-5 w-5" />} title="Women-only tour" description="Restrict participation to women travelers for safer community trips." />
-              <ToggleCard checked={Boolean(form.safeForSoloWomen)} onChange={(value) => set("safeForSoloWomen", value)} icon={<CheckCircle2 className="h-5 w-5" />} title="Solo women safe" description="Mark the tour as suitable for solo women with verified safety planning." />
-              <ToggleCard checked={Boolean(form.verifiedTravelersOnly)} onChange={(value) => set("verifiedTravelersOnly", value)} icon={<Eye className="h-5 w-5" />} title="Verified travelers only" description="Allow only travelers with completed verification or strong trust signals." />
-              <ToggleCard checked={Boolean(form.joinApprovalRequired)} onChange={(value) => set("joinApprovalRequired", value)} icon={<Users className="h-5 w-5" />} title="Host approval required" description="Review each join request before a traveler can enter the group." />
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-cyan-200 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,.18),transparent_34%),#f8fafc] p-5">
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <label className={labelCls}>Risk classification *</label>
+                    <select className={`${inputCls} appearance-none`} value={form.riskLevel} onChange={(event) => set("riskLevel", event.target.value)}>
+                      {[
+                        ["LOW", "Low — ordinary managed travel"],
+                        ["MEDIUM", "Medium — elevated activity or terrain"],
+                        ["HIGH", "High — specialist controls required"],
+                        ["VERY_HIGH", "Very high — publishing currently blocked"],
+                      ].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <FieldError error={errors.riskLevel} />
+                    <p className={helpCls}>Classify the actual itinerary, terrain, transport and remoteness. Difficulty and risk are separate.</p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Minimum traveler age *</label>
+                    <input type="number" min="5" max="100" className={inputCls} value={form.minimumAge} onChange={(event) => set("minimumAge", event.target.value)} />
+                    <FieldError error={errors.minimumAge} />
+                  </div>
+                </div>
+                {form.riskLevel === "VERY_HIGH" && (
+                  <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold leading-5 text-rose-800">
+                    You may document this tour, but administrators cannot publish very-high-risk supply until qualified caretaker assignment and incident controls are live.
+                  </p>
+                )}
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div>
+                  <label className={labelCls}>Honest risk disclosure *</label>
+                  <textarea className={inputCls} rows={5} maxLength={2000} value={form.riskDisclosure} placeholder="Describe terrain, weather, exertion, transport and other reasonably foreseeable risks without claiming the trip is completely safe." onChange={(event) => set("riskDisclosure", event.target.value)} />
+                  <FieldError error={errors.riskDisclosure} />
+                </div>
+                <div>
+                  <label className={labelCls}>Public meeting-point guidance *</label>
+                  <textarea className={inputCls} rows={5} maxLength={500} value={form.meetingPoint} placeholder="Name the public area and arrival guidance. Keep private phone numbers and home addresses out of this field." onChange={(event) => set("meetingPoint", event.target.value)} />
+                  <FieldError error={errors.meetingPoint} />
+                </div>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div>
+                  <label className={labelCls}>Eligibility requirements *</label>
+                  <DynamicList items={form.eligibilityRequirements} placeholder="Able to walk for 60 minutes with planned breaks" onChange={(index, value) => updateArray("eligibilityRequirements", index, value)} onAdd={() => addArray("eligibilityRequirements")} onRemove={(index) => removeArray("eligibilityRequirements", index)} />
+                  <FieldError error={errors.eligibilityRequirements} />
+                </div>
+                <div>
+                  <label className={labelCls}>Required equipment {(["HIGH", "VERY_HIGH"].includes(form.riskLevel)) ? "*" : ""}</label>
+                  <DynamicList items={form.requiredEquipment} placeholder="Weather-appropriate shoes supplied by traveler" onChange={(index, value) => updateArray("requiredEquipment", index, value)} onAdd={() => addArray("requiredEquipment")} onRemove={(index) => removeArray("requiredEquipment", index)} />
+                  <FieldError error={errors.requiredEquipment} />
+                </div>
+              </div>
+
+              {["MEDIUM", "HIGH", "VERY_HIGH"].includes(form.riskLevel) && (
+                <div>
+                  <label className={labelCls}>Emergency and escalation plan *</label>
+                  <textarea className={inputCls} rows={5} maxLength={4000} value={form.emergencyPlan} placeholder="Explain stop criteria, headcount, local response contacts, evacuation route, communication fallback and incident recording." onChange={(event) => set("emergencyPlan", event.target.value)} />
+                  <FieldError error={errors.emergencyPlan} />
+                  <p className={helpCls}>Operational coordination only. Do not claim medical care or guaranteed rescue.</p>
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ToggleCard checked={Boolean(form.womenOnly)} onChange={(value) => set("womenOnly", value)} icon={<ShieldCheck className="h-5 w-5" />} title="Women-only participation" description="Restrict participation as described in the listing; this is not a safety guarantee." />
+                <ToggleCard checked={Boolean(form.safeForSoloWomen)} onChange={(value) => set("safeForSoloWomen", value)} icon={<CheckCircle2 className="h-5 w-5" />} title="Solo-women considerations documented" description="Indicate that relevant planning was documented for admin review, without promising absolute safety." />
+                <ToggleCard checked={Boolean(form.verifiedTravelersOnly)} onChange={(value) => set("verifiedTravelersOnly", value)} icon={<Eye className="h-5 w-5" />} title="Verified travelers only" description="Require the supported traveler verification level; high-risk tours must enable this." />
+                <ToggleCard checked={Boolean(form.joinApprovalRequired)} onChange={(value) => set("joinApprovalRequired", value)} icon={<Users className="h-5 w-5" />} title="Host approval required" description="Review each join request; high-risk tours must enable this." />
+                {form.riskLevel === "VERY_HIGH" && <ToggleCard checked={Boolean(form.requiresCaretaker)} onChange={(value) => set("requiresCaretaker", value)} icon={<ShieldCheck className="h-5 w-5" />} title="Approved caretaker required" description="Records the requirement only; publishing remains blocked until assignment and qualification checks exist." />}
+              </div>
             </div>
           </SectionCard>
 
