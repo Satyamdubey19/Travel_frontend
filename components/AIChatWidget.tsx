@@ -128,7 +128,7 @@ export default function AIChatWidget() {
 
                   {msg.tours?.length ? (
                     <div className="flex flex-col gap-2">
-                      {msg.tours.map((tour: any) => (
+                      {msg.tours.map((tour) => (
                         <Link key={tour.link} href={tour.link} className="group flex items-center justify-between overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md">
                           <div className="min-w-0">
                             <p className="truncate text-xs font-semibold text-slate-800 group-hover:text-indigo-600">{tour.name}</p>

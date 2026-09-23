@@ -6,7 +6,6 @@ import { CheckCircle2, Clock3, Cog, CreditCard, IndianRupee, Wallet } from 'luci
 import { useAuth } from '@/contexts/AuthContext';
 import StatCard from '@/components/ui/StatCard';
 import StatusBadge from '@/components/ui/StatusBadge';
-import Spinner from '@/components/ui/Spinner';
 import { TablePageSkeleton } from '@/components/ui/loading-skeletons';
 import FilterTabs from '@/components/ui/FilterTabs';
 import Modal from '@/components/ui/Modal';
@@ -57,8 +56,8 @@ export default function AdminPayoutsPage() {
   const fetchPayouts = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get('/admin/payouts');
-      setPayouts(data);
+      const { data } = await api.get<{ data: Payout[] }>('/admin/payouts?limit=100');
+      setPayouts(data.data ?? []);
     } catch (error) {
       if (getApiErrorMessage(error).includes('401')) router.push('/login');
       console.error('Error fetching payouts:', error);
@@ -75,7 +74,7 @@ export default function AdminPayoutsPage() {
 
   const handleProcessClick = (payout: Payout) => {
     setSelectedPayout(payout);
-    setNewStatus('processing');
+    setNewStatus(payout.status === 'processing' ? 'completed' : 'processing');
     setTransactionId('');
     setFailureReason('');
     setShowProcessModal(true);
@@ -96,7 +95,7 @@ export default function AdminPayoutsPage() {
 
     setProcessingId(selectedPayout.id);
     try {
-      await api.put(`/admin/payouts/${selectedPayout.id}`, {
+      await api.patch(`/admin/payouts/${selectedPayout.id}`, {
           status: newStatus,
           transactionId: newStatus === 'completed' ? transactionId.trim() : undefined,
           failureReason: newStatus === 'failed' ? failureReason.trim() : undefined,
@@ -105,7 +104,7 @@ export default function AdminPayoutsPage() {
       showFeedback('success', `Payout moved to ${newStatus.toUpperCase()}`);
       setShowProcessModal(false);
       setSelectedPayout(null);
-      fetchPayouts();
+      void fetchPayouts();
     } catch (error) {
       console.error('Error processing payout:', error);
       showFeedback('error', 'Failed to process payout');
@@ -256,7 +255,7 @@ export default function AdminPayoutsPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {payout.status === 'pending' || payout.status === 'processing' ? (
+                      {payout.status !== 'completed' ? (
                         <button
                           onClick={() => handleProcessClick(payout)}
                           disabled={processingId === payout.id}
@@ -307,9 +306,10 @@ export default function AdminPayoutsPage() {
                     onChange={(e) => setNewStatus(e.target.value as 'processing' | 'completed' | 'failed')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                   >
-                    <option value="processing">Processing</option>
-                    <option value="completed">Completed</option>
-                    <option value="failed">Failed</option>
+                    {selectedPayout.status === 'pending' && <option value="processing">Processing</option>}
+                    {selectedPayout.status === 'processing' && <option value="completed">Completed</option>}
+                    {selectedPayout.status !== 'failed' && <option value="failed">Failed</option>}
+                    {selectedPayout.status === 'failed' && <option value="processing">Retry processing</option>}
                   </select>
                 </div>
 

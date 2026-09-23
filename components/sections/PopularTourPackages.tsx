@@ -7,7 +7,6 @@ import { tours } from '@/lib/tours'
 
 const TourPackages = () => {
   const [wishlist, setWishlist] = useState<string[]>([])
-  const [hoveredTour, setHoveredTour] = useState<string | null>(null)
 
   const toggleWishlist = (tourId: string) => {
     setWishlist((prev) =>
@@ -22,7 +21,7 @@ const TourPackages = () => {
         <div className="mb-12 text-center">
           <h2 className="text-4xl font-bold text-black mb-4">Popular Tour Packages</h2>
           <p className="text-gray-700 text-lg max-w-2xl mx-auto">
-            Discover amazing travel experiences to India's most incredible destinations with carefully curated itineraries and premium accommodations
+            Discover amazing travel experiences to India&apos;s most incredible destinations with carefully curated itineraries and premium accommodations
           </p>
         </div>
 
@@ -32,8 +31,6 @@ const TourPackages = () => {
             <div
               key={tour.id}
               className="group relative"
-              onMouseEnter={() => setHoveredTour(tour.id)}
-              onMouseLeave={() => setHoveredTour(null)}
             >
               <Link href={`/tours/${tour.slug}`}>
                 <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 h-full flex flex-col transform hover:-translate-y-2">

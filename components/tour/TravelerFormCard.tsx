@@ -2,14 +2,15 @@
 
 import { useEffect } from "react"
 import { useForm, useWatch } from "react-hook-form"
+import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
-import type { z } from "zod"
-import { AlertTriangle, CalendarDays, CheckCircle2, FileBadge, HeartPulse, Loader2, ShieldCheck, UserRound } from "lucide-react"
+import { AlertTriangle, CheckCircle2, FileBadge, HeartPulse, Loader2, ShieldCheck, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/Button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card"
 import { useValidateTourTraveler } from "@/hooks/useTourBooking"
 import { isValidAadhaar, maskAadhaar } from "@/lib/traveler-normalization"
 import { tourTravelerSchema, type TourTravelerInput } from "@/validators/tour-booking.validators"
+import DatePicker from "@/components/ui/DatePicker"
 
 type TravelerFormCardProps = {
   defaultValue?: Partial<TourTravelerInput>
@@ -122,13 +123,16 @@ export default function TravelerFormCard({ defaultValue, index, onRemove, onSave
             <span className={labelClass}>Age</span>
             <input className={inputClass} type="number" {...form.register("age")} />
           </label>
-          <label className="min-w-0">
-            <span className={labelClass}>Date of birth</span>
-            <div className="relative">
-              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input className={`${inputClass} pl-10`} type="date" {...form.register("dob")} />
-            </div>
-          </label>
+          <div className="min-w-0">
+            <DatePicker
+              label="Date of birth"
+              value={dob || ""}
+              onChange={(val) => form.setValue("dob", val, { shouldValidate: true })}
+              maxDate={new Date().toISOString().slice(0, 10)}
+              placeholder="Select date"
+            />
+            {form.formState.errors.dob ? <p className="mt-1 text-xs font-semibold text-rose-600">{form.formState.errors.dob.message}</p> : null}
+          </div>
           <label className="min-w-0">
             <span className={`${labelClass} flex items-center gap-2`}><ShieldCheck className="h-3.5 w-3.5" />Aadhaar number</span>
             <input className={inputClass} {...form.register("aadhaar")} inputMode="numeric" maxLength={14} placeholder="12 digit Aadhaar" />

@@ -174,28 +174,26 @@ Auth is coordinated by `contexts/AuthContext.tsx`.
 
 ### Session Hydration
 
-1. On app load, the context reads `localStorage.user`.
-2. It hydrates a temporary user immediately if local data exists.
-3. It calls `GET /api/auth/me`.
-4. If the backend returns a valid user, backend state replaces local state.
-5. If the backend is unavailable and a local session exists, the local session remains.
-6. If no session exists, user state is `null`.
+1. On app load, the context calls `GET /api/auth/me`.
+2. If the backend returns a valid first-party session, it stores the sanitized response only in React memory.
+3. If the request is unauthorized or unavailable, user state is `null`.
+4. Browser storage is never accepted as authentication or used as a fallback role source.
 
 ### Login
 
 ```text
 LoginForm
-  -> AuthContext.login(email, password, expectedRole?)
+  -> AuthContext.login(email, password)
   -> POST /api/auth/login
   -> backend validates credentials, email verification, account status, and lockout state
   -> backend sets httpOnly token and refreshToken cookies
   -> returns user payload
-  -> frontend stores sanitized user in localStorage
+  -> frontend stores sanitized user in React memory
 ```
 
 The frontend does not read either cookie directly. Authenticated API requests rely on the browser sending the backend cookies, and `GET /api/auth/me` is the source of truth after hydration.
 
-If the API is unavailable, the context can fall back to browser-stored demo/local accounts. This is only a development convenience and should not be treated as production authentication.
+If the API is unavailable, the context remains unauthenticated. It never falls back to browser-stored demo or local accounts.
 
 ### Signup
 
@@ -645,15 +643,10 @@ Fallback behavior should show `India`.
 
 Causes:
 
-- Stale `localStorage.user`.
-- Backend `/api/auth/me` returns different role data.
-- Browser has old local demo users.
+- The first-party session cookie is expired, revoked, or blocked by the backend.
+- Backend `/api/auth/me` returns a different current role/approval state.
 
-Fix:
-
-```text
-Clear site storage and log in again.
-```
+Fix: log in again, then let `GET /api/auth/me` refresh the current server-derived account state.
 
 ## Feature Ownership Map
 

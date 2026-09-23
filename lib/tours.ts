@@ -37,6 +37,14 @@ export type Tour = {
     inclusions: string[];
     exclusions: string[];
   };
+  riskLevel?: "LOW" | "MODERATE" | "HIGH" | "VERY_HIGH" | string | null;
+  languages?: string[];
+  minimumAge?: number | null;
+  riskDisclosure?: string | null;
+  meetingPoint?: string | null;
+  eligibilityRequirements?: string[];
+  requiredEquipment?: string[];
+  emergencyPlanRecorded?: boolean;
 };
 
 const tourImages = [
@@ -357,4 +365,72 @@ export const tours: Tour[] = [
       exclusions: ["Flights to Port Blair", "Personal expenses", "Travel insurance", "Underwater camera rental"],
     },
   },
+  {
+    id: "tour-7",
+    slug: "spiti-valley-overland-expedition",
+    title: "Spiti Valley Overland Expedition",
+    destination: "Spiti Valley, Himachal Pradesh",
+    location: {
+      lat: 32.2461,
+      lng: 78.0349,
+      city: "Kaza",
+      country: "India",
+    },
+    duration: 8,
+    price: 24500,
+    groupSize: "4-12 people",
+    rating: 4.95,
+    reviews: 184,
+    image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=1200&q=80",
+    ],
+    description: "Journey across high Himalayan passes into the Middle Land. Explore ancient 1000-year-old monasteries, world's highest post office, fossil villages, and sleep under millions of stars at Chandratal crescent lake.",
+    highlights: [
+      "Key Monastery dawn chanting and butter tea",
+      "Hikkim world's highest post office postcard dispatch",
+      "Komic high altitude village at 15,027 ft",
+      "Chandratal crescent lake alpine camping",
+      "Kunzum Pass prayer flags circumambulation",
+    ],
+    itinerary: [
+      { day: 1, title: "Shimla to Kalpa", description: "Scenic Kinnaur highway drive with views of Kinner Kailash.", activities: ["Highway transit", "Apple orchard walk"], meals: ["Dinner"] },
+      { day: 2, title: "Kalpa to Tabo", description: "Crossing into Spiti, visit 1000-year-old Tabo monastery.", activities: ["Monastery tour", "Meditation caves"], meals: ["Breakfast", "Dinner"] },
+      { day: 3, title: "Tabo to Kaza via Dhankar", description: "Clifftop fortress of Dhankar and drive along Spiti river into Kaza.", activities: ["Dhankar fort hike", "Kaza market stroll"], meals: ["Breakfast", "Dinner"] },
+      { day: 4, title: "High Altitude Villages", description: "Visit Hikkim, Komic, and Langza fossil park.", activities: ["Post office visit", "Fossil hunting", "Langza Buddha statue"], meals: ["Breakfast", "Dinner"] },
+      { day: 5, title: "Key Monastery & Kibber", description: "Iconic Key gompa and high suspension bridge of Chicham.", activities: ["Key monastery tour", "Chicham bridge photography"], meals: ["Breakfast", "Dinner"] },
+      { day: 6, title: "Kaza to Chandratal", description: "Over Kunzum pass (14,931 ft) to the mythical Moon Lake.", activities: ["Kunzum pass prayer flags", "Chandratal lake trek", "Stargazing camp"], meals: ["Breakfast", "Dinner"] },
+      { day: 7, title: "Chandratal to Manali", description: "Crossing the rugged Batal and Rohtang pass down into lush Kullu valley.", activities: ["Off-road crossing", "Manali celebratory dinner"], meals: ["Breakfast", "Dinner"] },
+      { day: 8, title: "Departure from Manali", description: "Farewell breakfast and return transit.", activities: ["Breakfast", "Departure"], meals: ["Breakfast"] },
+    ],
+    includedStays: ["Homestays & Alpine Camps"],
+    bestTimeToVisit: "June to October",
+    category: "adventure",
+    tags: ["spiti", "himalayas", "chandratal", "monastery", "offroad"],
+    budget: {
+      perPersonBase: 24500,
+      inclusions: ["7 nights accommodation", "All breakfasts and dinners", "4x4 expedition transport", "Inner line permits", "Certified local guide"],
+      exclusions: ["Transit to Shimla / from Manali", "Personal shopping", "Travel insurance"],
+    },
+  },
 ];
+
+export function findTourBySlug(slugOrId: string): Tour | undefined {
+  const norm = slugOrId.toLowerCase().trim();
+  return (
+    tours.find((t) => t.slug === norm || t.id === norm) ||
+    tours.find(
+      (t) =>
+        (norm.includes("spiti") && t.slug.includes("spiti")) ||
+        (norm.includes("kerala") && t.slug.includes("kerala")) ||
+        (norm.includes("himalayan") && t.slug.includes("himalayan")) ||
+        (norm.includes("golden") && t.slug.includes("golden")) ||
+        (norm.includes("goa") && t.slug.includes("goa")) ||
+        (norm.includes("corbett") && t.slug.includes("corbett")) ||
+        (norm.includes("andaman") && t.slug.includes("andaman")) ||
+        (norm.includes("rajasthan") && t.slug.includes("rajasthan"))
+    )
+  );
+}

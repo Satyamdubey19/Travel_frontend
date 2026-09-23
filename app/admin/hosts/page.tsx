@@ -6,10 +6,10 @@ import { Building2, CheckCircle2, Clock3, IndianRupee, MapPin, Search } from 'lu
 import { useAuth } from '@/contexts/AuthContext';
 import StatCard from '@/components/ui/StatCard';
 import StatusBadge from '@/components/ui/StatusBadge';
-import Spinner from '@/components/ui/Spinner';
 import { TablePageSkeleton } from '@/components/ui/loading-skeletons';
 import FilterTabs from '@/components/ui/FilterTabs';
 import Input from '@/components/ui/Input';
+import api from '@/lib/axios';
 
 interface Host {
   id: string;
@@ -45,38 +45,8 @@ export default function AdminHostsPage() {
   const fetchHosts = async () => {
     try {
       setLoading(true);
-      // This would call an API endpoint for admin hosts
-      // For now, using mock data
-      setHosts([
-        {
-          id: '1',
-          businessName: 'Mumbai Travel Ltd',
-          email: 'contact@mumbaitravel.com',
-          phone: '+91-9876543210',
-          city: 'Mumbai',
-          isVerified: true,
-          kycStatus: 'APPROVED',
-          totalProperties: 5,
-          totalBookings: 245,
-          revenue: 1250000,
-          joinedAt: new Date(Date.now() - 180*24*60*60*1000).toISOString(),
-          lastActive: new Date(Date.now() - 2*24*60*60*1000).toISOString(),
-        },
-        {
-          id: '2',
-          businessName: 'Goa Beach Resorts',
-          email: 'contact@goabeach.com',
-          phone: '+91-9876543211',
-          city: 'Goa',
-          isVerified: false,
-          kycStatus: 'PENDING',
-          totalProperties: 3,
-          totalBookings: 89,
-          revenue: 450000,
-          joinedAt: new Date(Date.now() - 30*24*60*60*1000).toISOString(),
-          lastActive: new Date().toISOString(),
-        },
-      ]);
+      const { data } = await api.get<{ data: Host[] }>('/admin/hosts?limit=100');
+      setHosts(data.data ?? []);
     } catch (error) {
       console.error('Error fetching hosts:', error);
     } finally {

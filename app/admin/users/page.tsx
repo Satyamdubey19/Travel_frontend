@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { Building2, Search, ShieldCheck, UserCheck, UserRound, Users, UserX } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import StatCard from '@/components/ui/StatCard';
 import StatusBadge from '@/components/ui/StatusBadge';
-import Spinner from '@/components/ui/Spinner';
 import { TablePageSkeleton } from '@/components/ui/loading-skeletons';
 import FilterTabs from '@/components/ui/FilterTabs';
+import Input from '@/components/ui/Input';
+import api, { getApiErrorMessage } from '@/lib/axios';
 
 interface User {
   id: string;
@@ -18,6 +19,8 @@ interface User {
   role: 'USER' | 'HOST' | 'ADMIN';
   createdAt: string;
   isActive: boolean;
+  status: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
+  isHost: boolean;
 }
 
 export default function AdminUsersPage() {
@@ -26,59 +29,56 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'USER' | 'HOST' | 'ADMIN'>('all');
+  const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) {
       router.push('/');
       return;
     }
-    fetchUsers();
+    void fetchUsers();
   }, [isAdmin, router]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      // This would call an API endpoint for admin users
-      // For now, using mock data
-      setUsers([
-        {
-          id: '1',
-          email: 'john@example.com',
-          name: 'John Doe',
-          phone: '+91-9876543210',
-          role: 'USER',
-          createdAt: new Date(Date.now() - 30*24*60*60*1000).toISOString(),
-          isActive: true,
-        },
-        {
-          id: '2',
-          email: 'host@example.com',
-          name: 'Mumbai Travel Co',
-          phone: '+91-9876543211',
-          role: 'HOST',
-          createdAt: new Date(Date.now() - 60*24*60*60*1000).toISOString(),
-          isActive: true,
-        },
-        {
-          id: '3',
-          email: 'admin@gethotels.com',
-          name: 'Admin User',
-          phone: '+91-9876543212',
-          role: 'ADMIN',
-          createdAt: new Date(Date.now() - 120*24*60*60*1000).toISOString(),
-          isActive: true,
-        },
-      ]);
+      setError('');
+      const { data } = await api.get<{ data: User[] }>('/admin/users?limit=100');
+      setUsers(data.data ?? []);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      setError(getApiErrorMessage(error, 'Unable to load user accounts'));
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredUsers = filter === 'all' 
-    ? users 
-    : users.filter(u => u.role === filter);
+  const updateStatus = async (user: User, status: 'ACTIVE' | 'SUSPENDED') => {
+    const reason = status === 'SUSPENDED'
+      ? window.prompt(`Why are you suspending ${user.name}? This reason is written to the audit log.`)?.trim()
+      : undefined;
+    if (status === 'SUSPENDED' && !reason) return;
+
+    try {
+      setUpdatingId(user.id);
+      setError('');
+      await api.patch(`/admin/users/${user.id}`, { status, reason });
+      setUsers((current) => current.map((item) => item.id === user.id
+        ? { ...item, status, isActive: status === 'ACTIVE' }
+        : item));
+      setFeedback(`${user.name} is now ${status.toLowerCase()}.`);
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Unable to update this account'));
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const filteredUsers = users
+    .filter((user) => filter === 'all' || user.role === filter)
+    .filter((user) => [user.name, user.email, user.phone ?? ''].some((value) => value.toLowerCase().includes(search.toLowerCase().trim())));
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'USER':
@@ -140,7 +140,17 @@ export default function AdminUsersPage() {
           />
         </div>
 
-        <div className="mb-6">
+        {(error || feedback) && (
+          <div role="status" className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-semibold ${error ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+            {error || feedback}
+          </div>
+        )}
+
+        <div className="mb-6 space-y-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, or phone" className="pl-11" />
+          </div>
           <FilterTabs
             tabs={['all', 'USER', 'HOST', 'ADMIN'] as const}
             active={filter}
@@ -169,6 +179,7 @@ export default function AdminUsersPage() {
                   <th className="px-6 py-4 text-left font-semibold text-gray-900">Role</th>
                   <th className="px-6 py-4 text-left font-semibold text-gray-900">Joined</th>
                   <th className="px-6 py-4 text-left font-semibold text-gray-900">Status</th>
+                  <th className="px-6 py-4 text-left font-semibold text-gray-900">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -191,7 +202,22 @@ export default function AdminUsersPage() {
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4">
-                      <StatusBadge status={user.isActive ? 'Active' : 'Inactive'} colorMap={{ Active: 'success', Inactive: 'default' }} />
+                      <StatusBadge status={user.status} colorMap={{ ACTIVE: 'success', SUSPENDED: 'warning', DELETED: 'error' }} />
+                    </td>
+                    <td className="px-6 py-4">
+                      {user.status === 'DELETED' ? (
+                        <span className="text-xs font-semibold text-slate-400">Permanent state</span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={updatingId === user.id}
+                          onClick={() => void updateStatus(user, user.isActive ? 'SUSPENDED' : 'ACTIVE')}
+                          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition disabled:cursor-wait disabled:opacity-50 ${user.isActive ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                        >
+                          {user.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                          {updatingId === user.id ? 'Updating…' : user.isActive ? 'Suspend' : 'Reactivate'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -65,8 +65,9 @@ export interface SectionCardProps {
 }
 
 export interface SocialAuthButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  icon: ReactNode;
-  label: string;
+  icon?: ReactNode;
+  label?: string;
+  provider?: "google";
 }
 
 export interface SpinnerProps {

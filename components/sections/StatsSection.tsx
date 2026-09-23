@@ -36,24 +36,6 @@ function useCountUp(target: number, duration = 2000, shouldStart: boolean) {
   return count
 }
 
-function StatItem({ stat, shouldAnimate }: { stat: typeof stats[0]; shouldAnimate: boolean }) {
-  const count = useCountUp(stat.value, 2000, shouldAnimate)
-
-  return (
-    <div className="text-center group">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 text-3xl mb-4 group-hover:scale-110 transition-transform duration-300">
-        {stat.icon}
-      </div>
-      <p className="text-4xl md:text-5xl font-black text-slate-900 mb-2">
-        {count.toLocaleString()}{stat.suffix}
-      </p>
-      <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
-        {stat.label}
-      </p>
-    </div>
-  )
-}
-
 export default function StatsSection() {
   const ref = useRef<HTMLDivElement>(null)
   const [isVisible, setIsVisible] = useState(false)

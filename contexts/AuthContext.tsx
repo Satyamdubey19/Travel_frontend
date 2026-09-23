@@ -14,6 +14,36 @@ export interface AuthUser {
   roles: AuthRole[]
   phone?: string
   businessName?: string
+  isHostApproved?: boolean
+  hasHostApplication?: boolean
+  reconsentRequired?: boolean
+  pendingPolicies?: Array<{
+    id: string
+    type: string
+    version: string
+    title: string
+    summary: string | null
+  }>
+}
+
+export interface AuthDevice {
+  id: string
+  deviceId: string
+  deviceName?: string | null
+  browser?: string | null
+  os?: string | null
+  lastSeenAt?: string
+  isCurrent?: boolean
+}
+
+export class DeviceLimitError extends Error {
+  readonly devices: AuthDevice[]
+
+  constructor(message: string, devices: AuthDevice[]) {
+    super(message)
+    this.name = "DeviceLimitError"
+    this.devices = devices
+  }
 }
 
 interface SignupPayload {
@@ -23,210 +53,32 @@ interface SignupPayload {
   password: string
   accountType: "USER" | "HOST"
   businessName?: string
+  agreedToTerms?: boolean
+  consentGiven?: boolean
 }
-
-interface BecomeHostPayload {
-  businessName: string
-  phone?: string
-}
-
-interface StoredAccount extends AuthUser {
-  password: string
-}
+interface BecomeHostPayload { businessName: string; phone?: string }
 
 interface AuthContextType {
   user: AuthUser | null
   loading: boolean
-  login: (email: string, password: string, expectedRole?: AuthRole) => Promise<AuthUser>
+  login: (email: string, password: string) => Promise<AuthUser>
+  replaceDeviceLogin: (email: string, password: string, deviceToLogout: string) => Promise<AuthUser>
   signup: (payload: SignupPayload) => Promise<AuthUser>
   becomeHost: (payload: BecomeHostPayload) => Promise<AuthUser>
-  updateUser: (updates: Partial<AuthUser>) => AuthUser | null
+  updateUser: (updates: Pick<Partial<AuthUser>, "name" | "email" | "phone" | "businessName">) => AuthUser | null
   logout: () => Promise<void>
   isAuthenticated: boolean
   isHost: boolean
+  isHostApplicant: boolean
   isAdmin: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-const SESSION_KEY = "user"
-const ACCOUNTS_KEY = "registeredUsers"
+type ApiUser = { id: number | string; email: string; name: string; role: AuthRole; phone?: string | null; businessName?: string | null; isHost?: boolean; hasHostApplication?: boolean; isHostApproved?: boolean }
 
-function getBootstrapAccounts(): StoredAccount[] {
-  return [
-    hydrateAccount({
-      id: "admin-gethotels-demo",
-      email: "admin@gethotels.com",
-      name: "GetHotels Admin",
-      password: "Admin@123",
-      role: "ADMIN",
-      roles: ["ADMIN"],
-    }),
-  ]
-}
-
-function normalizeRoles(roles?: AuthRole[], role?: AuthRole) {
-  const nextRoles = new Set<AuthRole>(roles ?? [])
-
-  if (role) {
-    nextRoles.add(role)
-  }
-
-  if (nextRoles.has("HOST")) {
-    nextRoles.add("USER")
-  }
-
-  if (nextRoles.size === 0) {
-    nextRoles.add("USER")
-  }
-
-  return Array.from(nextRoles)
-}
-
-function sanitizeUser(account: StoredAccount): AuthUser {
-  return {
-    id: account.id,
-    email: account.email,
-    name: account.name,
-    role: account.role,
-    roles: normalizeRoles(account.roles, account.role),
-    phone: account.phone,
-    businessName: account.businessName,
-  }
-}
-
-function resolvePrimaryRole(role: AuthRole, isHost: boolean): AuthRole {
-  if (role === "ADMIN") {
-    return "ADMIN"
-  }
-
-  if (role === "HOST") {
-    return "HOST"
-  }
-
-  if (isHost) {
-    return "HOST"
-  }
-
-  return "USER"
-}
-
-function createAuthUserFromApiUser(apiUser: {
-  id: number | string
-  email: string
-  name: string
-  role: AuthRole
-  phone?: string | null
-  businessName?: string | null
-  isHost: boolean
-}) {
-  const primaryRole = resolvePrimaryRole(apiUser.role, apiUser.isHost)
-  const roles = normalizeRoles(
-    [apiUser.role, ...(apiUser.isHost ? ["HOST" as const] : [])],
-    primaryRole,
-  )
-
-  return sanitizeUser(
-    hydrateAccount({
-      id: String(apiUser.id),
-      email: apiUser.email,
-      name: apiUser.name,
-      role: primaryRole,
-      roles,
-      phone: apiUser.phone ?? undefined,
-      businessName: apiUser.businessName ?? undefined,
-    }),
-  )
-}
-
-function hydrateAccount(raw: Partial<StoredAccount>): StoredAccount {
-  const roles = normalizeRoles(raw.roles, raw.role)
-  const preferredRole = raw.role && roles.includes(raw.role) ? raw.role : roles[0]
-
-  return {
-    id: raw.id ?? crypto.randomUUID(),
-    email: raw.email ?? "",
-    name: raw.name ?? raw.email?.split("@")[0] ?? "Guest",
-    role: preferredRole,
-    roles,
-    phone: raw.phone,
-    businessName: raw.businessName,
-    password: raw.password ?? "",
-  }
-}
-
-function readAccounts(): StoredAccount[] {
-  if (typeof window === "undefined") {
-    return []
-  }
-
-  const bootstrapAccounts = getBootstrapAccounts()
-  const storedAccounts = localStorage.getItem(ACCOUNTS_KEY)
-  if (!storedAccounts) {
-    writeAccounts(bootstrapAccounts)
-    return bootstrapAccounts
-  }
-
-  try {
-    const parsedAccounts = JSON.parse(storedAccounts) as Partial<StoredAccount>[]
-    const hydratedAccounts = parsedAccounts.map(hydrateAccount)
-    const mergedAccounts = [...hydratedAccounts]
-
-    for (const bootstrapAccount of bootstrapAccounts) {
-      if (!mergedAccounts.some(account => account.email.toLowerCase() === bootstrapAccount.email.toLowerCase())) {
-        mergedAccounts.push(bootstrapAccount)
-      }
-    }
-
-    if (mergedAccounts.length !== hydratedAccounts.length) {
-      writeAccounts(mergedAccounts)
-    }
-
-    return mergedAccounts
-  } catch (error) {
-    console.error("Failed to parse stored accounts:", error)
-    localStorage.removeItem(ACCOUNTS_KEY)
-    writeAccounts(bootstrapAccounts)
-    return bootstrapAccounts
-  }
-}
-
-function writeAccounts(accounts: StoredAccount[]) {
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts))
-}
-
-function persistSession(nextUser: AuthUser | null, setUser: (user: AuthUser | null) => void) {
-  setUser(nextUser)
-
-  if (nextUser) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(nextUser))
-    return
-  }
-
-  localStorage.removeItem(SESSION_KEY)
-}
-
-function loginFromLocalAccount(email: string, password: string) {
-  const normalizedEmail = email.trim().toLowerCase()
-  const accounts = readAccounts()
-  const existingAccount = accounts.find(account => account.email.toLowerCase() === normalizedEmail)
-
-  if (!existingAccount) {
-    throw new Error("Account not found. Please sign up first")
-  }
-
-  if (existingAccount.password !== password) {
-    throw new Error("Incorrect email or password")
-  }
-
-  const primaryRole = resolvePrimaryRole(
-    existingAccount.roles.includes("ADMIN") || existingAccount.role === "ADMIN" ? "ADMIN" : "USER",
-    existingAccount.roles.includes("HOST") || existingAccount.role === "HOST",
-  )
-  const roles = normalizeRoles(existingAccount.roles, existingAccount.role)
-  const nextAccount = hydrateAccount({ ...existingAccount, role: primaryRole, roles })
-  const nextAccounts = accounts.map(account => (account.id === nextAccount.id ? nextAccount : account))
-  writeAccounts(nextAccounts)
-  return sanitizeUser(nextAccount)
+function fromApiUser(user: ApiUser): AuthUser {
+  const role = user.role === "ADMIN" ? "ADMIN" : user.role === "HOST" && user.isHost ? "HOST" : "USER"
+  return { id: String(user.id), email: user.email, name: user.name, role, roles: role === "HOST" ? ["USER", "HOST"] : [role], phone: user.phone ?? undefined, businessName: user.businessName ?? undefined, hasHostApplication: Boolean(user.hasHostApplication), isHostApproved: Boolean(user.isHostApproved) }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -234,197 +86,138 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let cancelled = false
-
-    const hydrateSession = async () => {
-      const storedUser = localStorage.getItem(SESSION_KEY)
-
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser) as Partial<AuthUser>
-          const hydratedUser = sanitizeUser(hydrateAccount(parsedUser))
-          if (!cancelled) {
-            setUser(hydratedUser)
-          }
-          localStorage.setItem(SESSION_KEY, JSON.stringify(hydratedUser))
-        } catch (error) {
-          console.error("Failed to parse stored user:", error)
-          localStorage.removeItem(SESSION_KEY)
-        }
-      }
-
-      try {
-        const { data: payload } = await api.get("/auth/me", {
-          headers: { "Cache-Control": "no-store" },
-        })
-        const nextUser = createAuthUserFromApiUser(payload.user)
-        if (!cancelled) {
-          persistSession(nextUser, setUser)
-        }
-      } catch {
-        if (!storedUser && !cancelled) {
-          setUser(null)
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
-    void hydrateSession()
-
+    const handleSessionExpired = () => {
+      setUser(null);
+    };
+    window.addEventListener("auth:session-expired", handleSessionExpired);
     return () => {
-      cancelled = true
-    }
+      window.removeEventListener("auth:session-expired", handleSessionExpired);
+    };
+  }, []);
+
+  useEffect(() => {
+    void api.get("/auth/me", { headers: { "Cache-Control": "no-store" } })
+      .then(({ data }) => {
+        if (typeof window !== "undefined") {
+          const token = data.token || data.accessToken;
+          if (token) {
+            localStorage.setItem("accessToken", token);
+            localStorage.setItem("token", token);
+          }
+          if (data.deviceId) {
+            localStorage.setItem("deviceId", data.deviceId);
+          }
+        }
+        setUser(fromApiUser(data.user));
+      })
+      .catch(() => {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("token");
+          localStorage.removeItem("refreshToken");
+          localStorage.removeItem("deviceId");
+        }
+        setUser(null);
+      })
+      .finally(() => setLoading(false))
   }, [])
 
-  const login = async (email: string, password: string, expectedRole?: AuthRole) => {
+  const login = async (email: string, password: string) => {
     try {
-      const { data: payload } = await api.post("/auth/login", { email, password, type: expectedRole })
-      const nextUser = createAuthUserFromApiUser(payload.user)
-      if (expectedRole && !nextUser.roles.includes(expectedRole)) {
-        throw new Error(`This account does not have ${expectedRole.toLowerCase()} access`)
+      const { data } = await api.post("/auth/login", { email, password })
+      if (typeof window !== "undefined") {
+        const token = data.token || data.accessToken;
+        if (token) {
+          localStorage.setItem("accessToken", token);
+          localStorage.setItem("token", token);
+        }
+        if (data.refreshToken) {
+          localStorage.setItem("refreshToken", data.refreshToken);
+        }
+        if (data.deviceId) {
+          localStorage.setItem("deviceId", data.deviceId);
+        }
       }
-      persistSession(nextUser, setUser)
+      const nextUser = fromApiUser(data.user)
+      setUser(nextUser)
       return nextUser
     } catch (error) {
-      const message = getApiErrorMessage(error)
-      if (!/Network Error|Failed to fetch|NetworkError|Load failed/i.test(message)) {
-        throw new Error(message)
+      const payload = (error as { response?: { data?: { error?: string; message?: string; devices?: AuthDevice[] } } }).response?.data
+      if (payload?.error === "DEVICE_LIMIT_REACHED" && Array.isArray(payload.devices)) {
+        throw new DeviceLimitError(payload.message ?? "Maximum device limit reached", payload.devices)
       }
+      throw new Error(getApiErrorMessage(error, "Unable to sign in. Please try again."))
+    }
+  }
 
-      const nextUser = loginFromLocalAccount(email, password)
-      if (expectedRole && !nextUser.roles.includes(expectedRole)) {
-        throw new Error(`This account does not have ${expectedRole.toLowerCase()} access`)
+  const replaceDeviceLogin = async (email: string, password: string, deviceToLogout: string) => {
+    try {
+      const { data } = await api.post("/auth/login/replace-device", { email, password, deviceToLogout })
+      if (typeof window !== "undefined") {
+        const token = data.token || data.accessToken;
+        if (token) {
+          localStorage.setItem("accessToken", token);
+          localStorage.setItem("token", token);
+        }
+        if (data.refreshToken) {
+          localStorage.setItem("refreshToken", data.refreshToken);
+        }
+        if (data.deviceId) {
+          localStorage.setItem("deviceId", data.deviceId);
+        }
       }
-      persistSession(nextUser, setUser)
+      const nextUser = fromApiUser(data.user)
+      setUser(nextUser)
       return nextUser
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, "Unable to replace that device. Please try again."))
     }
   }
 
   const signup = async ({ name, email, phone, password, accountType, businessName }: SignupPayload) => {
     try {
-      const { data: payload } = await api.post("/auth/register", {
-        name,
-        email,
-        phone,
-        password,
-        role: accountType === "HOST" ? "host" : "user",
-        businessName: accountType === "HOST" ? businessName?.trim() : undefined,
-      })
-
-      const nextUser = createAuthUserFromApiUser(payload.user)
-      const fallbackAccount = hydrateAccount({
-        id: nextUser.id,
-        email: nextUser.email,
-        name: nextUser.name,
-        password,
-        role: nextUser.role,
-        roles: nextUser.roles,
-        phone: nextUser.phone,
-        businessName: nextUser.businessName,
-      })
-      const accounts = readAccounts()
-      const nextAccounts = [
-        ...accounts.filter(account => account.email.toLowerCase() !== fallbackAccount.email.toLowerCase()),
-        fallbackAccount,
-      ]
-      writeAccounts(nextAccounts)
-      persistSession(nextUser, setUser)
-      return nextUser
-    } catch (error) {
-      throw new Error(getApiErrorMessage(error, "Failed to create account. Please try again."))
-    }
+      const { data } = await api.post("/auth/register", { name, email, phone, password, role: accountType === "HOST" ? "host" : "user", businessName: accountType === "HOST" ? businessName?.trim() : undefined })
+      if (typeof window !== "undefined" && data.deviceId) {
+        localStorage.setItem("deviceId", data.deviceId);
+      }
+      return fromApiUser(data.user)
+    } catch (error) { throw new Error(getApiErrorMessage(error, "Failed to create account. Please try again.")) }
   }
 
   const becomeHost = async ({ businessName, phone }: BecomeHostPayload) => {
-    if (!user) {
-      throw new Error("Please log in to activate host access")
-    }
-
-    const response = await api.patch("/auth/me", {
-        name: user.name,
-        email: user.email,
-        phone: phone?.trim() || user.phone,
-        businessName: businessName.trim(),
-        activateHost: true,
-      }).catch(() => null)
-
-    if (response) {
-      const payload = response.data
-      const nextUser = createAuthUserFromApiUser(payload.user)
-      persistSession(nextUser, setUser)
+    if (!user) throw new Error("Please sign in to apply as a host")
+    try {
+      const { data } = await api.patch("/auth/me", { businessName: businessName.trim(), phone: phone?.trim() || user.phone, activateHost: true })
+      const nextUser = fromApiUser(data.user)
+      setUser(nextUser)
       return nextUser
-    }
-
-    const accounts = readAccounts()
-    const existingAccount = accounts.find(account => account.id === user.id || account.email.toLowerCase() === user.email.toLowerCase())
-    const nextAccount = hydrateAccount({
-      ...(existingAccount ?? user),
-      password: existingAccount?.password ?? "",
-      role: "HOST",
-      roles: normalizeRoles([...(existingAccount?.roles ?? user.roles), "HOST"], "HOST"),
-      businessName: businessName.trim(),
-      phone: phone?.trim() || existingAccount?.phone || user.phone,
-    })
-
-    const nextAccounts = existingAccount
-      ? accounts.map(account => (account.id === existingAccount.id ? nextAccount : account))
-      : [...accounts, nextAccount]
-
-    writeAccounts(nextAccounts)
-    const nextUser = sanitizeUser(nextAccount)
-    persistSession(nextUser, setUser)
-    return nextUser
+    } catch (error) { throw new Error(getApiErrorMessage(error, "Could not submit your host application.")) }
   }
 
-  const updateUser = (updates: Partial<AuthUser>) => {
-    if (!user) {
-      return null
-    }
-
-    const nextUser = sanitizeUser(hydrateAccount({
-      ...user,
-      ...updates,
-      roles: updates.roles ?? user.roles,
-      role: updates.role ?? user.role,
-    }))
-    persistSession(nextUser, setUser)
+  const updateUser = (updates: Pick<Partial<AuthUser>, "name" | "email" | "phone" | "businessName">) => {
+    if (!user) return null
+    const nextUser = { ...user, ...updates }
+    setUser(nextUser)
     return nextUser
   }
 
   const logout = async () => {
-    persistSession(null, setUser)
-
+    setUser(null)
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("deviceId");
+    }
     await api.post("/auth/logout").catch(() => undefined)
     await signOut({ redirect: false }).catch(() => undefined)
   }
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        login,
-        signup,
-        becomeHost,
-        updateUser,
-        logout,
-        isAuthenticated: !!user,
-        isHost: !!user?.roles.includes("HOST"),
-        isAdmin: !!user?.roles.includes("ADMIN"),
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={{ user, loading, login, replaceDeviceLogin, signup, becomeHost, updateUser, logout, isAuthenticated: Boolean(user), isHost: user?.role === "HOST" && Boolean(user.isHostApproved), isHostApplicant: Boolean(user?.hasHostApplication), isAdmin: user?.role === "ADMIN" }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within AuthProvider")
-  }
+  if (!context) throw new Error("useAuth must be used within AuthProvider")
   return context
 }

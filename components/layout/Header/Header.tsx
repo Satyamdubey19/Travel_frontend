@@ -5,10 +5,8 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   BadgeCheck,
-  Bell,
   BookOpen,
   CalendarCheck,
-  Gift,
   Heart,
   HelpCircle,
   ImageIcon,
@@ -25,12 +23,15 @@ import LocationDetector from "@/components/search/LocationDetector"
 import { useWishlist } from "@/contexts/WishlistContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+import NotificationMenu from "@/components/notifications/NotificationMenu"
+import BrandMark from "@/components/ui/BrandMark"
 
 const navItems = [
   { label: "Explore", href: "/" },
   { label: "Tours", href: "/tours" },
-  { label: "Contests", href: "/posts" },
   { label: "Activities", href: "/activities" },
+  { label: "Rentals", href: "/car-rental" },
+  { label: "Community", href: "/posts" },
 ]
 
 type MenuLinkProps = {
@@ -47,10 +48,10 @@ function ProfileMenuLink({ href, label, icon: Icon, active, badge, onClick }: Me
     <Link
       href={href}
       onClick={onClick}
-      className={`group flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200 ease-out ${
+      className={`group flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200 ease-out ${
         active
           ? "bg-slate-950 text-white shadow-[0_8px_24px_rgba(15,23,42,0.22)]"
-          : "text-slate-800 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-[0_10px_22px_rgba(15,23,42,0.08)]"
+          : "text-slate-800 hover:bg-slate-50"
       }`}
     >
       <Icon
@@ -88,9 +89,9 @@ const Header = () => {
     maxHeight: 520,
   })
 
-  const profileName = user?.name || "Alexander Mitchell"
-  const profileEmail = user?.email || "alex.mitchell@premium.com"
-  const isHost = user?.role === "HOST" || user?.role === "ADMIN"
+  const profileName = user?.name || "Traveler"
+  const profileEmail = user?.email || ""
+  const hasActiveHostWorkspace = user?.role === "HOST" && user.isHostApproved === true
   const avatarInitials = (user?.name || user?.email || "GH")
     .split(" ")
     .filter(Boolean)
@@ -159,39 +160,42 @@ const Header = () => {
     { label: "Travel Posts", href: "/posts", icon: ImageIcon },
   ]
 
-  const hostLinks = [
-    { label: isHost ? "Host Dashboard" : "Become a Host", href: "/host", icon: LayoutGrid },
-    { label: "Manage Tours", href: "/host/tours", icon: Ticket },
-    { label: "Hosting Earnings", href: "/host/payments", icon: WalletCards },
-  ]
+  const hostLinks = hasActiveHostWorkspace
+    ? [
+        { label: "Host Dashboard", href: "/host", icon: LayoutGrid },
+        { label: "Manage Tours", href: "/host/tours", icon: Ticket },
+        { label: "Hosting Earnings", href: "/host/payments", icon: WalletCards },
+      ]
+    : user?.hasHostApplication
+      ? [{ label: "Continue host verification", href: "/host/kyc", icon: BadgeCheck }]
+      : [{ label: "Become a host", href: "/host/signup", icon: BookOpen }]
+
+  const adminLinks = user?.role === "ADMIN"
+    ? [{ label: "Admin workspace", href: "/admin", icon: LayoutGrid }]
+    : []
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/95 shadow-[0_1px_20px_rgba(15,23,42,0.05)] backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/88 shadow-[0_8px_35px_rgba(15,23,42,.045)] backdrop-blur-2xl">
+      <div className="mx-auto flex h-[4.5rem] max-w-[1480px] items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
-            className="flex size-9 items-center justify-center rounded-full text-slate-900 transition hover:bg-slate-100 md:hidden"
+            className="flex size-9 items-center justify-center rounded-lg text-slate-900 transition hover:bg-slate-100 md:hidden"
             aria-label="Open menu"
           >
             <Menu size={19} />
           </button>
-          <Link href="/" className="group inline-flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_60%,#06b6d4_100%)] text-[11px] font-black tracking-tight text-white shadow-[0_6px_18px_rgba(29,78,216,0.35)] transition-transform duration-200 group-hover:scale-105">
-              GH
-            </span>
-            <span className="text-[17px] font-black tracking-tight text-slate-950 sm:text-[18px]">GetHotels</span>
-          </Link>
+          <BrandMark />
         </div>
 
-        <nav className="hidden items-center gap-8 text-sm font-medium text-slate-600 md:flex">
+        <nav className="hidden h-full items-center gap-7 text-sm font-semibold text-slate-500 md:flex">
           {navItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}
-              className={`rounded-full px-1.5 py-2 transition ${
-                isActive(item.href) ? "text-slate-950" : "hover:text-slate-950"
+              className={`relative flex h-full items-center px-1 transition duration-300 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-left after:bg-cyan-700 after:transition-transform ${
+                isActive(item.href) ? "text-slate-950 after:scale-x-100" : "hover:text-slate-950 after:scale-x-0 hover:after:scale-x-100"
               }`}
             >
               {item.label}
@@ -203,19 +207,11 @@ const Header = () => {
           <div className="hidden min-w-0 max-w-[220px] items-center lg:flex">
             <LocationDetector />
           </div>
-          <button
-            type="button"
-            className="flex size-8 items-center justify-center rounded-full text-slate-800 transition hover:bg-slate-100"
-            aria-label="Notifications"
-          >
-            <Bell size={17} strokeWidth={2} />
-          </button>
+          <NotificationMenu key={user?.id ?? "guest"} enabled={isAuthenticated} />
 
           <div
             className="relative z-50"
             ref={dropdownRef}
-            onMouseEnter={() => setProfileOpen(true)}
-            onMouseLeave={() => setProfileOpen(false)}
           >
             <button
               ref={triggerRef}
@@ -224,7 +220,7 @@ const Header = () => {
               aria-haspopup="true"
               aria-label={isAuthenticated ? "Open account menu" : "Open sign in menu"}
               onClick={() => setProfileOpen((value) => !value)}
-              className={`flex size-10 items-center justify-center overflow-hidden rounded-full border bg-white p-1 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+              className={`flex size-10 items-center justify-center overflow-hidden rounded-lg border bg-white p-1 shadow-sm transition duration-200 hover:shadow-md ${
                 profileOpen ? "border-slate-400 ring-4 ring-slate-200/70" : "border-slate-200 hover:border-slate-300"
               }`}
             >
@@ -242,7 +238,7 @@ const Header = () => {
             </button>
 
             <div
-              className={`absolute right-0 z-50 flex w-[min(88vw,340px)] flex-col overflow-hidden overscroll-contain rounded-[22px] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] transition-all duration-300 ease-out ${
+              className={`absolute right-0 z-50 flex w-[min(91vw,360px)] flex-col overflow-hidden overscroll-contain rounded-2xl border border-slate-200 bg-white/95 shadow-[0_30px_90px_rgba(15,23,42,.18)] backdrop-blur-2xl transition-all duration-300 ease-out ${
                 profileMenuPlacement.openUp ? "bottom-[calc(100%+10px)] origin-bottom-right" : "top-[calc(100%+10px)] origin-top-right"
               } ${
                 profileOpen
@@ -273,7 +269,7 @@ const Header = () => {
                     </div>
                     <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#8cefe2] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-teal-900">
                       <BadgeCheck size={13} />
-                      Gold Tier Member
+                      {user?.role ?? "USER"} account
                     </div>
                   </div>
 
@@ -294,23 +290,42 @@ const Header = () => {
                     </div>
 
                     <div className="my-3 border-t border-slate-100" />
-                    <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-slate-400">Host</p>
-                    <div className="space-y-1">
-                      {hostLinks.map((item) => (
-                        <ProfileMenuLink
-                          key={item.label}
-                          href={item.href}
-                          label={item.label}
-                          icon={item.icon}
-                          active={isActive(item.href)}
-                          onClick={closeProfile}
-                        />
-                      ))}
-                    </div>
+                    {adminLinks.length > 0 ? (
+                      <>
+                        <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-slate-400">Admin</p>
+                        <div className="space-y-1">
+                          {adminLinks.map((item) => (
+                            <ProfileMenuLink
+                              key={item.label}
+                              href={item.href}
+                              label={item.label}
+                              icon={item.icon}
+                              active={isActive(item.href)}
+                              onClick={closeProfile}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-slate-400">Host</p>
+                        <div className="space-y-1">
+                          {hostLinks.map((item) => (
+                            <ProfileMenuLink
+                              key={item.label}
+                              href={item.href}
+                              label={item.label}
+                              icon={item.icon}
+                              active={isActive(item.href)}
+                              onClick={closeProfile}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
 
                     <div className="my-3 border-t border-slate-100" />
                     <div className="space-y-1">
-                      <ProfileMenuLink href="/profile" label="Rewards & Referrals" icon={Gift} onClick={closeProfile} />
                       <ProfileMenuLink href="/profile" label="Settings" icon={Settings} onClick={closeProfile} />
                       <ProfileMenuLink href="/terms" label="Help & Support" icon={HelpCircle} onClick={closeProfile} />
                     </div>
@@ -332,7 +347,7 @@ const Header = () => {
               ) : (
                 <>
                   <div className="border-b border-slate-100 px-4 py-4">
-                    <p className="text-base font-semibold text-slate-950">Welcome to GetHotels</p>
+                    <p className="text-base font-semibold text-slate-950">Welcome to Travels Pro</p>
                     <p className="mt-1 text-sm text-slate-500">Sign in to manage trips, wishlist items, and host tools.</p>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb:hover]:bg-slate-400">
@@ -353,7 +368,7 @@ const Header = () => {
                     <div className="my-3 border-t border-slate-100" />
                     <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-slate-400">Host</p>
                     <div className="space-y-1">
-                      <ProfileMenuLink href="/login?role=HOST" label="Host Sign In" icon={BookOpen} onClick={closeProfile} />
+                      <ProfileMenuLink href="/login?intent=host" label="Sign in to host" icon={BookOpen} onClick={closeProfile} />
                       <ProfileMenuLink href="/host/signup" label="List Tours" icon={BookOpen} onClick={closeProfile} />
                     </div>
                   </div>
@@ -365,7 +380,7 @@ const Header = () => {
       </div>
 
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="inset-y-0 flex h-dvh max-h-dvh flex-col overflow-y-auto rounded-r-[32px]">
+        <SheetContent side="left" className="inset-y-0 flex h-dvh max-h-dvh flex-col overflow-y-auto">
           <SheetTitle className="sr-only">Mobile navigation</SheetTitle>
           <div className="relative overflow-hidden bg-[linear-gradient(135deg,#020617_0%,#0f172a_45%,#1e293b_100%)] px-5 pb-6 pt-14 text-white">
             <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-cyan-400/20 blur-2xl" />
@@ -387,10 +402,7 @@ const Header = () => {
                 <p className="truncate text-xs text-white/55">{isAuthenticated ? profileEmail : "Sign in to unlock trips"}</p>
               </div>
             </div>
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#5EEAD4] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-teal-950">
-              <BadgeCheck size={14} />
-              Gold Tier Member
-            </div>
+            {isAuthenticated && <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#5EEAD4] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-teal-950"><BadgeCheck size={14} />{user?.role ?? "USER"} account</div>}
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col px-4 py-5">
@@ -399,8 +411,9 @@ const Header = () => {
               {[
                 { label: "Explore", href: "/", icon: Sparkles },
                 { label: "Tours", href: "/tours", icon: Ticket },
-                { label: "Contests", href: "/posts", icon: Gift },
+                { label: "Community", href: "/posts", icon: ImageIcon },
                 { label: "Activities", href: "/activities", icon: CalendarCheck },
+                { label: "Rentals", href: "/car-rental", icon: WalletCards },
               ].map((item, index) => {
                 const active = isActive(item.href)
                 const Icon = item.icon

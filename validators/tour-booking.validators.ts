@@ -36,6 +36,7 @@ export const createTourBookingIntentSchema = z.object({
   contactPhone: z.string().trim().min(6).max(30),
   specialRequests: z.string().trim().max(1000).optional(),
   idempotencyKey: z.string().trim().min(8).max(120).optional(),
+  riskAcknowledged: z.literal(true),
 })
 
 export const addTourTravelersSchema = z.object({

@@ -169,11 +169,15 @@ export default function ProfilePage() {
   const [isMounted, setIsMounted] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
+  const [emailChangePassword, setEmailChangePassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [savedToast, setSavedToast] = useState(false)
+  const [savedToastMessage, setSavedToastMessage] = useState('Settings saved successfully!')
   const [darkMode, setDarkMode] = useState(false)
 
   useEffect(() => {
@@ -198,19 +202,61 @@ export default function ProfilePage() {
 
 
   const handleSaveProfile = async () => {
+    const emailChanged = editedProfile.email.trim().toLowerCase() !== userProfile.email.trim().toLowerCase()
+    if (emailChanged && !emailChangePassword) {
+      alert('Enter your current password to request an email change.')
+      return
+    }
+
     setIsSaving(true)
     try {
-      await api.patch('/auth/me', editedProfile)
-
-      setUserProfile(editedProfile)
-      localStorage.setItem(getProfileStorageKey(authUser?.id), JSON.stringify(editedProfile))
-      updateUser({
+      const { data } = await api.patch('/auth/me', {
         name: editedProfile.name,
-        email: editedProfile.email,
-        phone: editedProfile.phone || undefined,
+        phone: editedProfile.phone,
+        location: editedProfile.location,
+        bio: editedProfile.bio,
+        dateOfBirth: editedProfile.dateOfBirth,
+        gender: editedProfile.gender,
+        nationality: editedProfile.nationality,
+        address: editedProfile.address,
+        emergencyContactName: editedProfile.emergencyContactName,
+        emergencyContactPhone: editedProfile.emergencyContactPhone,
+        website: editedProfile.website,
+        instagram: editedProfile.instagram,
+        twitter: editedProfile.twitter,
+        travelStyle: editedProfile.travelStyle,
+        preferredCurrency: editedProfile.preferredCurrency,
+        preferredLanguage: editedProfile.preferredLanguage,
+        dietaryPreferences: editedProfile.dietaryPreferences,
+        passportNumber: editedProfile.passportNumber === 'Not added' ? '' : editedProfile.passportNumber,
+        frequentFlyerNumber: editedProfile.frequentFlyerNumber === 'Not added' ? '' : editedProfile.frequentFlyerNumber,
       })
+
+      if (emailChanged) {
+        await api.post('/auth/email-change/request', {
+          email: editedProfile.email.trim(),
+          password: emailChangePassword,
+        })
+      }
+
+      const nextProfile = {
+        ...editedProfile,
+        // A requested address is not the account email until its protected
+        // link is explicitly confirmed. Keep every local view truthful.
+        email: emailChanged ? userProfile.email : (data.user?.email ?? userProfile.email),
+      }
+
+      setUserProfile(nextProfile)
+      setEditedProfile(nextProfile)
+      localStorage.setItem(getProfileStorageKey(authUser?.id), JSON.stringify(nextProfile))
+      updateUser({
+        name: data.user?.name ?? editedProfile.name,
+        email: data.user?.email ?? userProfile.email,
+        phone: (data.user?.phone ?? editedProfile.phone) || undefined,
+      })
+      setEmailChangePassword('')
       setIsEditMode(false)
-      showSavedToast()
+      showSavedToast(emailChanged ? 'Profile saved. Confirm the link sent to your new email.' : 'Profile saved securely!')
     } catch (error) {
       alert(getApiErrorMessage(error, 'Failed to save profile'))
     } finally {
@@ -223,12 +269,32 @@ export default function ProfilePage() {
     showSavedToast()
   }
 
+  const handleChangePassword = async () => {
+    setPasswordError('')
+    if (!currentPassword || !newPassword) return setPasswordError('Enter your current password and a new password.')
+    if (newPassword.length < 12) return setPasswordError('Use a new password with at least 12 characters.')
+    if (newPassword !== confirmPassword) return setPasswordError('Passwords do not match.')
+    setIsChangingPassword(true)
+    try {
+      await api.post('/auth/change-password', { currentPassword, newPassword })
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      window.location.assign('/login?password=changed')
+    } catch (error) {
+      setPasswordError(getApiErrorMessage(error, 'We could not update your password.'))
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
   const handleSavePrivacy = () => {
     localStorage.setItem('privacySettings', JSON.stringify(privacy))
     showSavedToast()
   }
 
-  const showSavedToast = () => {
+  const showSavedToast = (message = 'Settings saved successfully!') => {
+    setSavedToastMessage(message)
     setSavedToast(true)
     setTimeout(() => setSavedToast(false), 2500)
   }
@@ -487,7 +553,6 @@ export default function ProfilePage() {
             <div className="grid sm:grid-cols-2 gap-4">
               {[
                 { label: 'Full Name', key: 'name' as const, type: 'text' },
-                { label: 'Email', key: 'email' as const, type: 'email' },
                 { label: 'Phone', key: 'phone' as const, type: 'tel' },
                 { label: 'Date of Birth', key: 'dateOfBirth' as const, type: 'date' },
                 { label: 'Location', key: 'location' as const, type: 'text' },
@@ -503,6 +568,17 @@ export default function ProfilePage() {
                   />
                 </div>
               ))}
+              <div className="sm:col-span-2 rounded-xl border border-violet-100 bg-violet-50/60 p-4">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email</label>
+                <input
+                  type="email"
+                  value={editedProfile.email}
+                  onChange={e => setEditedProfile({ ...editedProfile, email: e.target.value })}
+                  autoComplete="email"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition"
+                />
+                {editedProfile.email.trim().toLowerCase() !== profile.email.trim().toLowerCase() ? <div className="mt-3"><p className="text-xs leading-5 text-slate-600">To protect your account, enter your current password. We will send a confirmation link to the new address; your sign-in email will not change until you confirm it.</p><label className="mt-3 block text-xs font-semibold text-slate-700">Current password</label><input type="password" value={emailChangePassword} onChange={e => setEmailChangePassword(e.target.value)} autoComplete="current-password" placeholder="Enter current password" className="mt-1.5 w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition" /></div> : null}
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Gender</label>
                 <select
@@ -730,12 +806,13 @@ export default function ProfilePage() {
           {newPassword && confirmPassword && newPassword !== confirmPassword && (
             <p className="text-xs text-red-500">Passwords do not match</p>
           )}
+          {passwordError ? <p role="alert" className="text-xs font-semibold text-red-600">{passwordError}</p> : null}
           <button
-            onClick={() => { setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); showSavedToast() }}
-            disabled={!currentPassword || !newPassword || newPassword !== confirmPassword}
+            onClick={() => void handleChangePassword()}
+            disabled={isChangingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword}
             className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Update Password
+            {isChangingPassword ? 'Updating securely...' : 'Update Password'}
           </button>
         </div>
       </SectionCard>
@@ -1217,7 +1294,7 @@ export default function ProfilePage() {
       {savedToast && (
         <div className="fixed top-20 right-6 z-50 bg-green-600 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-semibold animate-[slideIn_0.3s_ease]">
           <CheckCircle size={18} />
-          Settings saved successfully!
+          {savedToastMessage}
         </div>
       )}
 

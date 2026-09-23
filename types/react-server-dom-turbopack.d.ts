@@ -1,4 +1,4 @@
 declare module "react-server-dom-turbopack/server" {
-  export const decodeReply: any
-  export const registerClientReference: any
+  export function decodeReply<T = unknown>(...args: unknown[]): Promise<T>
+  export function registerClientReference<T>(reference: T, moduleId: string, exportName: string): T
 }
